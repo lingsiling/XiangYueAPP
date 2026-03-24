@@ -8,16 +8,13 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
-    logdialog.cpp \
-    mainwindow.cpp
+    serverwidget.cpp
 
 HEADERS += \
-    logdialog.h \
-    mainwindow.h
+    serverwidget.h
 
 FORMS += \
-    logdialog.ui \
-    mainwindow.ui
+    serverwidget.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

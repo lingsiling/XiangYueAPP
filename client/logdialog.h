@@ -2,12 +2,12 @@
 #define LOGDIALOG_H
 
 #include <QDialog>
+#include <QTcpSocket>
 
-QT_BEGIN_NAMESPACE
 namespace Ui {
 class LogDialog;
 }
-QT_END_NAMESPACE
+
 
 class LogDialog : public QDialog
 {
@@ -26,5 +26,7 @@ private:
     Ui::LogDialog *ui;
 
     bool isShow;//状态：是否显示密码
+
+    QTcpSocket *tcpSocket;//提供给mainwindow使用的通信套接字
 };
 #endif // LOGDIALOG_H
