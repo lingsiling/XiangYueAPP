@@ -1,6 +1,7 @@
 #ifndef SERVERWIDGET_H
 #define SERVERWIDGET_H
 
+#include "fileserver.h"
 #include <QWidget>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -19,10 +20,14 @@ public:
     explicit ServerWidget(QWidget *parent = nullptr);
     ~ServerWidget() override;
 
-private:
+protected:
     Ui::ServerWidget *ui;
 
     QTcpServer *tcpServer;//监听套接字（服务器）
     QTcpSocket *tcpSocket;//通信套接字（客户端）
+
+private:
+    FileServer *fileServer;//文件服务器对象
+
 };
 #endif // SERVERWIDGET_H

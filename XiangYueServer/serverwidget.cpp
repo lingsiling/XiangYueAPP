@@ -1,5 +1,6 @@
 #include "serverwidget.h"
 #include "ui_serverwidget.h"
+#include "fileserver.h"
 
 ServerWidget::ServerWidget(QWidget *parent)
     : QWidget(parent)
@@ -7,6 +8,8 @@ ServerWidget::ServerWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
+    //创建文件逻辑对象
+    fileServer = new FileServer(this);
     //创建服务器对象
     tcpServer = new QTcpServer(this);
 
@@ -33,24 +36,26 @@ ServerWidget::ServerWidget(QWidget *parent)
         //打印信息
         QString msg = QString("客户端连接：[%1:%2]").arg(ip).arg(port);
         ui->textEdit->append(msg);
+
+        //客户端发送请求,接收客户端数据
+        connect(tcpSocket, &QTcpSocket::readyRead, this, [=](){
+
+            QByteArray data = tcpSocket->readAll();
+
+            //交给文件逻辑处理
+            fileServer->process(tcpSocket, data);
+        });
+
+        //客户端断开
+        connect(tcpSocket, &QTcpSocket::disconnected, this, [=](){
+            ui->textEdit->append("客户端断开连接");
+            tcpSocket->deleteLater();
+        });
     });
-
-    //接收客户端数据
-    // connect(tcpSocket,&QTcpSocket::readyRead,this,[=](){
-    //    //读取数据
-    //     QByteArray data = tcpSocket->readAll();
-    //     QString str = QString::fromUtf8(data);
-    //     ui->textEdit->append("收到数据：" + str);
-    // });
-
-    //客户端断开连接
-    // connect(tcpSocket, &QTcpSocket::disconnected, this, [=]() {
-    //     ui->textEdit->append("客户端断开连接");
-    //     tcpSocket->deleteLater(); // 释放资源
-    // });
 }
 
 ServerWidget::~ServerWidget()
 {
     delete ui;
 }
+

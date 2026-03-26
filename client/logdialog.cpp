@@ -1,6 +1,7 @@
 #include "logdialog.h"
 #include "ui_logdialog.h"
 #include "mainwindow.h"
+#include "fileclient.h"
 
 LogDialog::LogDialog(QWidget *parent)
     : QDialog(parent)
@@ -30,7 +31,7 @@ LogDialog::LogDialog(QWidget *parent)
 }
 
 LogDialog::~LogDialog()
-{
+{    
     delete ui;
 }
 
@@ -62,7 +63,7 @@ void LogDialog::on_buttonlogin_clicked()
         return;
     }
 
-    // 创建主窗口 并把socket传过去
+    // 创建主窗口 并把socket传给mainwindow
     MainWindow *w = new MainWindow(nullptr,tcpSocket);
     w->show();
     // 关闭当前登录窗口
