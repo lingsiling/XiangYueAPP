@@ -10,16 +10,19 @@ SOURCES += \
     fileclient.cpp \
     main.cpp \
     logdialog.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    resourcedetaildialog.cpp
 
 HEADERS += \
     fileclient.h \
     logdialog.h \
-    mainwindow.h
+    mainwindow.h \
+    resourcedetaildialog.h
 
 FORMS += \
     logdialog.ui \
-    mainwindow.ui
+    mainwindow.ui \
+    resourcedetaildialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

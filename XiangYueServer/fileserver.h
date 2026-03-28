@@ -21,7 +21,7 @@ private:
     qint64 recvSize = 0;
     QFile file;
 
-    QString saveDir = "../../../../ClientSave/"; // 保存目录
+    QString saveDir = "D:/Qt/Projects/XiangYueAPP/ServerSave/"; // 保存目录
 
     //内部逻辑
     void handleUpload(QTcpSocket *client, QByteArray data);// 重写客户端数据

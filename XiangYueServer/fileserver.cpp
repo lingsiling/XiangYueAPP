@@ -68,6 +68,11 @@ void FileServer::sendFileList(QTcpSocket *client)
 {
     QDir dir(saveDir);
 
+    if (!dir.exists()) {
+        qDebug() << "目录不存在:" << saveDir;
+        return;
+    }
+
     QStringList list = dir.entryList(QDir::Files);
 
     QString data = "LIST##" + list.join("##");

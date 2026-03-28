@@ -1,8 +1,10 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "resourcedetaildialog.h"
 #include "fileclient.h"
 #include <QFileDialog>
 #include <QFileInfo>
+
 MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -28,10 +30,14 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         fileClient->uploadFile(filePath);
     });
 
-    //点击下载
-    connect(ui->listWidget, &QListWidget::itemClicked, this, [=](QListWidgetItem *item){
+    // 双击资源列表项：跳转到资源详情页
+    connect(ui->listWidget, &QListWidget::itemDoubleClicked, this, [=](QListWidgetItem *item){
 
-        fileClient->downloadFile(item->text());
+        QString resourceName = item->text();
+        // 打开资源详情对话框（模态）
+        // 这里把资源名、fileClient 传给详情页，详情页里点“下载”再触发下载
+        ResourceDetailDialog dlg(this, resourceName, fileClient);
+        dlg.exec();
     });
 }
 
