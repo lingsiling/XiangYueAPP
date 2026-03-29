@@ -42,6 +42,17 @@ ServerWidget::ServerWidget(QWidget *parent)
 
             QByteArray data = tcpSocket->readAll();
 
+            //打印接收数据
+            if (data.startsWith("LIST") || data.startsWith("DOWNLOAD##") || data.startsWith("UPLOAD##"))
+            {
+                ui->textEdit->append("recv head=" + QString::fromUtf8(data.left(80)));
+            }
+            else
+            {
+                ui->textEdit->append("recv head=(binary)");
+                // 或者：ui->textEdit->append("recv hex=" + data.left(32).toHex(' '));
+            }
+
             //交给文件逻辑处理
             fileServer->process(tcpSocket, data);
         });

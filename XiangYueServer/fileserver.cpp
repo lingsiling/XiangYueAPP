@@ -5,61 +5,95 @@ FileServer::FileServer(QObject *parent) : QObject(parent)
 {
 }
 
-// 重写客户端数据（根据客户端发送数据的第一组关键词）
+//客户端数据（根据客户端发送数据的第一组关键词）
 void FileServer::process(QTcpSocket *client, QByteArray data)
 {
-    QString str = QString::fromUtf8(data);
+    qDebug() << "isUploadStart=" << isUploadStart
+             << "recvSize/fileSize=" << recvSize << "/" << fileSize
+             << "buf=" << m_buf.size();
 
-    if(str.startsWith("UPLOAD##") || !isUploadStart)
+    m_buf += data;
+
+    //如果正在上传，优先消费二进制缓冲内容
+    if(!isUploadStart)
     {
-        handleUpload(client, data);
+        consumeUploadData(client);
+        if(!isUploadStart) return;
     }
-    else if(str == "LIST")
+
+    //按行处理命令（LIST/DOWNLOAD/UPLOAD头）
+    tryProcessLines(client);
+
+    //可能刚进入上传状态且缓冲区里已粘了内容
+    if(!isUploadStart)
     {
-        sendFileList(client);
-    }
-    else if(str.startsWith("DOWNLOAD##"))
-    {
-        QString fileName = str.split("##")[1];
-        sendFile(client, fileName);
+        consumeUploadData(client);
     }
 }
 
-//客户端请求文件上传（分两步：第一步接收文件信息，第二步接收文件内容）
-void FileServer::handleUpload(QTcpSocket *client, QByteArray data)
+void FileServer::tryProcessLines(QTcpSocket *client)
 {
-    if(isUploadStart)
+    while(true)
     {
-        isUploadStart = false;
+        int pos = m_buf.indexOf('\n');
+        if(pos < 0) break;
 
-        QStringList list = QString(data).split("##");
+        QByteArray line = m_buf.left(pos);
+        m_buf.remove(0, pos + 1);
 
-        fileName = list[1];
-        fileSize = list[2].toLongLong();
-        recvSize = 0;
+        QString str = QString::fromUtf8(line).trimmed();
 
-        QDir().mkpath(saveDir);
-
-        QString path = saveDir + fileName;
-
-        file.setFileName(path);
-        bool isOK = file.open(QIODevice::WriteOnly);
-        if(false == isOK)
+        if(str.startsWith("UPLOAD##"))
         {
-            qDebug()<<"只写打开文件失败 fileserver49";
-        }
-        return;
-    }
+            isUploadStart = false;
 
-    qint64 len = file.write(data);
+            QStringList list = str.split("##");
+            fileName = list.value(1).trimmed();
+            fileSize = list.value(2).toLongLong();
+            recvSize = 0;
+
+            QDir().mkpath(saveDir);
+            QString path = saveDir + fileName;
+
+            file.setFileName(path);
+            if(!file.open(QIODevice::WriteOnly))
+            {
+                qDebug() << "只写打开文件失败:" << path;
+                isUploadStart = true;
+            }
+
+            //进入上传状态后退出，交给 consumeUploadData()
+            if(!isUploadStart) return;
+        }
+        else if(str == "LIST")
+        {
+            sendFileList(client);
+        }
+        else if(str.startsWith("DOWNLOAD##"))
+        {
+            QString fn = str.split("##").value(1).trimmed();
+            sendFile(client, fn);
+        }
+    }
+}
+
+void FileServer::consumeUploadData(QTcpSocket *client)
+{
+    if(isUploadStart) return;
+
+    qint64 need = fileSize - recvSize;
+    qint64 canWrite = qMin<qint64>(need, m_buf.size());
+    if(canWrite <= 0) return;
+
+    qint64 len = file.write(m_buf.constData(), canWrite);
     recvSize += len;
+    m_buf.remove(0, canWrite);
 
     if(recvSize >= fileSize)
     {
         file.close();
         isUploadStart = true;
-
-        sendFileList(client); // 自动刷新
+        sendFileList(client);
     }
 }
 
@@ -75,7 +109,7 @@ void FileServer::sendFileList(QTcpSocket *client)
 
     QStringList list = dir.entryList(QDir::Files);
 
-    QString data = "LIST##" + list.join("##");
+    QString data = "LIST##" + list.join("##") + "\n";
 
     client->write(data.toUtf8());
 }
@@ -89,13 +123,13 @@ void FileServer::sendFile(QTcpSocket *client, const QString &fileName)
 
     if(!file.open(QIODevice::ReadOnly))
     {
-        qDebug() << "只读打开文件失败 fileserver87";
+        qDebug() << "只读打开文件失败 126";
         return;
     }
 
     qint64 size = file.size();
 
-    QString head = QString("FILE##%1##%2").arg(fileName).arg(size);
+    QString head = QString("FILE##%1##%2\n").arg(fileName).arg(size);
 
     client->write(head.toUtf8());
 

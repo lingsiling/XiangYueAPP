@@ -7,7 +7,7 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,const QString &resour
 {
     ui->setupUi(this);
 
-    // 显示资源名
+    //显示资源名
     ui->labelResourceName->setText(m_resourceName);
 }
 
@@ -34,5 +34,5 @@ void ResourceDetailDialog::on_buttonDownload_clicked()
 
 void ResourceDetailDialog::on_buttonComment_clicked()
 {
-    // 先不管留言功能：这里先留空即可，保证能编译
+    //先不管留言功能：这里先留空即可，保证能编译
 }
