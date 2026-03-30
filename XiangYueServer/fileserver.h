@@ -27,7 +27,6 @@ private:
 
 private:
     //内部逻辑
-    void handleUpload(QTcpSocket *client, QByteArray data);// 重写客户端数据
     void sendFile(QTcpSocket *client, const QString &fileName);// 发送文件
     void sendFileList(QTcpSocket *client);
 

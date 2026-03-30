@@ -1,7 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-
+#include  "resourcesearch.h"
 #include <QMainWindow>
 #include <QTcpSocket>
 #include <QFile>
@@ -23,6 +23,11 @@ public:
 
 protected:
     Ui::MainWindow *ui;
+
+private:
+    ResourceSearch m_search;        //搜索逻辑
+    QStringList m_allResources;     //全量资源（服务端 LIST）
+    void refreshList(const QStringList &list); //刷新UI
 private:
     QTcpSocket *tcpSocket;//通信套接字
     FileClient *fileClient;//文件客户端对象

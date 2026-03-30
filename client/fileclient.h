@@ -42,6 +42,9 @@ private:
     qint64 recvSize = 0;
     QFile file;
 
+signals:
+    void resourcesUpdated(const QStringList &list); //服务端列表更新时发出
+
 private:
     void handleDownload(QByteArray data); //下载处理
     void handleList(QByteArray data);     //列表处理

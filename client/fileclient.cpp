@@ -135,8 +135,7 @@ void FileClient::handleList(QByteArray data)
     QStringList list = QString::fromUtf8(data).split("##");
     list.removeFirst();
 
-    mainWindow->findChild<QListWidget*>("listWidget")->clear();
-    mainWindow->findChild<QListWidget*>("listWidget")->addItems(list);
+    emit resourcesUpdated(list);
 }
 
 //下载处理只处理 FILE 头（行），不再处理二进制内容（交给 onReadyRead 的 consumeDownloadData）

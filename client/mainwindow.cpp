@@ -20,6 +20,22 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     //进入自动请求列表
     fileClient->requestList();
 
+    //接收服务端列表更新
+    connect(fileClient, &FileClient::resourcesUpdated, this, [=](const QStringList &list){
+        m_allResources = list;
+        m_search.setAllResources(list);
+
+        //如果搜索框为空，显示全量；否则保持当前搜索结果（更友好）
+        QString key = ui->searchline->text();
+        refreshList(m_search.filter(key));
+    });
+
+    //搜索按钮
+    connect(ui->buttonSearch, &QPushButton::clicked, this, [=](){
+        QString key = ui->searchline->text();
+        refreshList(m_search.filter(key));
+    });
+
     //上传按钮
     connect(ui->buttonUpload, &QPushButton::clicked, this, [=]() {
 
@@ -39,6 +55,12 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         ResourceDetailDialog dlg(this, resourceName, fileClient);
         dlg.exec();
     });
+}
+
+void MainWindow::refreshList(const QStringList &list)
+{
+    ui->listWidget->clear();
+    ui->listWidget->addItems(list);
 }
 
 MainWindow::~MainWindow()

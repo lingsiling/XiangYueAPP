@@ -11,13 +11,15 @@ SOURCES += \
     main.cpp \
     logdialog.cpp \
     mainwindow.cpp \
-    resourcedetaildialog.cpp
+    resourcedetaildialog.cpp \
+    resourcesearch.cpp
 
 HEADERS += \
     fileclient.h \
     logdialog.h \
     mainwindow.h \
-    resourcedetaildialog.h
+    resourcedetaildialog.h \
+    resourcesearch.h
 
 FORMS += \
     logdialog.ui \
