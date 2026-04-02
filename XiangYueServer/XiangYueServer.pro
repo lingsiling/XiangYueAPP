@@ -1,4 +1,4 @@
-QT += widgets network
+QT += widgets network sql
 
 CONFIG += c++17
 
@@ -7,13 +7,19 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    authservice.cpp \
+    dbmanager.cpp \
     fileserver.cpp \
     main.cpp \
-    serverwidget.cpp
+    serverwidget.cpp \
+    userrepository.cpp
 
 HEADERS += \
+    authservice.h \
+    dbmanager.h \
     fileserver.h \
-    serverwidget.h
+    serverwidget.h \
+    userrepository.h
 
 FORMS += \
     serverwidget.ui

@@ -25,7 +25,7 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         m_allResources = list;
         m_search.setAllResources(list);
 
-        //如果搜索框为空，显示全量；否则保持当前搜索结果（更友好）
+        //如果搜索框为空，显示全量；否则保持当前搜索结果
         QString key = ui->searchline->text();
         refreshList(m_search.filter(key));
     });

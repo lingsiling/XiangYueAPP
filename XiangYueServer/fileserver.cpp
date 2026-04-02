@@ -1,4 +1,5 @@
 #include "fileserver.h"
+#include "authservice.h"
 #include <QDir>
 
 FileServer::FileServer(QObject *parent) : QObject(parent)
@@ -73,6 +74,48 @@ void FileServer::tryProcessLines(QTcpSocket *client)
         {
             QString fn = str.split("##").value(1).trimmed();
             sendFile(client, fn);
+        }
+        else if (str.startsWith("REGISTER##"))
+        {
+            // Controller 只做：解析命令 -> 调 Service -> 回包
+            // 业务规则在 AuthService 内部
+            QStringList p = str.split("##");
+            QString username = p.value(1);
+            QString password = p.value(2);
+
+            AuthService service;
+            auto res = service.registerUser(username, password);
+
+            if (res.ok) {
+                client->write("REGISTER_OK\n");
+            } else {
+                QString msg = "REGISTER_FAIL##" + res.reason + "\n";
+                client->write(msg.toUtf8());
+            }
+        }
+        else if (str.startsWith("LOGIN##"))
+        {
+            QStringList p = str.split("##");
+            QString username = p.value(1);
+            QString password = p.value(2);
+
+            AuthService service;
+            auto res = service.login(username, password);
+
+            if (res.ok)
+            {
+                // 登录成功：把 userId/username/avatar 返回给客户端
+                QString msg = QString("LOGIN_OK##%1##%2##%3\n")
+                                  .arg(res.userId)
+                                  .arg(res.username)
+                                  .arg(res.avatar);
+                client->write(msg.toUtf8());
+            }
+            else
+            {
+                QString msg = "LOGIN_FAIL##" + res.reason + "\n";
+                client->write(msg.toUtf8());
+            }
         }
     }
 }
