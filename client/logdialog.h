@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QTcpSocket>
+#include <QMetaObject>
 
 namespace Ui {
 class LogDialog;
@@ -32,6 +33,7 @@ private:
     // 解决 TCP 粘包：服务端所有回复都是以 '\n' 结尾的一行
     QByteArray m_buf;
 
+    QMetaObject::Connection m_readyReadConn; // 保存 readyRead 连接，方便登录后断开
 private:
     void processLines(); //按行解析服务端返回（REGISTER_OK / LOGIN_OK 等）
 };

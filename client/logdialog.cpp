@@ -28,7 +28,7 @@ LogDialog::LogDialog(QWidget *parent)
     });
 
     // 接收服务端返回（REGISTER_OK / LOGIN_OK 等），按行解析
-    connect(tcpSocket, &QTcpSocket::readyRead, this, [=]() {
+    m_readyReadConn = connect(tcpSocket, &QTcpSocket::readyRead, this, [=]() {
         m_buf += tcpSocket->readAll();
         processLines();
     });
@@ -129,6 +129,9 @@ void LogDialog::processLines()
             QString userId = p.value(1);
             QString username = p.value(2);
             QString avatar = p.value(3);
+
+            // 登录成功后：不允许 LogDialog 再读 socket（否则会抢包）
+            disconnect(m_readyReadConn);
 
             // 登录成功才进入主界面
             MainWindow *w = new MainWindow(nullptr, tcpSocket);

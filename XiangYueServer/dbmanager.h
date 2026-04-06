@@ -25,6 +25,7 @@ public:
     // 发生错误时，外部可显示到 UI
     QString lastErrorText() const;
 
+    QSqlDatabase openForCurrentThread(const QString &dbFilePath);
 private:
     DBManager();                 //单例：外部不可直接 new
 

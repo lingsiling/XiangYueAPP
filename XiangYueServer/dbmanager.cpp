@@ -2,6 +2,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
+#include <QThread>
 
 DBManager::DBManager()
 {
@@ -36,7 +37,37 @@ bool DBManager::open(const QString &dbFilePath)
 
 QSqlDatabase DBManager::db() const
 {
+    const QString connName = QString("sqlite_conn_%1")
+    .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
+
+    if (QSqlDatabase::contains(connName))
+        return QSqlDatabase::database(connName);
+
+    // fallback：主线程初始化连接
     return m_db;
+}
+
+QSqlDatabase DBManager::openForCurrentThread(const QString &dbFilePath)
+{
+    // 每线程一个连接名，避免跨线程共享同一个 QSqlDatabase
+    const QString connName = QString("sqlite_conn_%1")
+                                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
+
+    if (QSqlDatabase::contains(connName)) {
+        QSqlDatabase db = QSqlDatabase::database(connName);
+        if (!db.isOpen()) {
+            db.setDatabaseName(dbFilePath);
+            db.open();
+        }
+        return db;
+    }
+
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
+    db.setDatabaseName(dbFilePath);
+    if (!db.open()) {
+        qDebug() << "[DB] openForCurrentThread failed:" << db.lastError().text();
+    }
+    return db;
 }
 
 QString DBManager::lastErrorText() const

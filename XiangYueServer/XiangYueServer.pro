@@ -8,17 +8,19 @@ CONFIG += c++17
 
 SOURCES += \
     authservice.cpp \
+    clientworker.cpp \
     dbmanager.cpp \
-    fileserver.cpp \
     main.cpp \
     serverwidget.cpp \
+    threadedtcpserver.cpp \
     userrepository.cpp
 
 HEADERS += \
     authservice.h \
+    clientworker.h \
     dbmanager.h \
-    fileserver.h \
     serverwidget.h \
+    threadedtcpserver.h \
     userrepository.h
 
 FORMS += \

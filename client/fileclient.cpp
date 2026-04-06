@@ -4,6 +4,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QDir>
+#include <QCoreApplication>
 
 //负责时刻响应并处理服务端发送来的消息
 FileClient::FileClient(QTcpSocket *socket,MainWindow *ui)
@@ -58,6 +59,16 @@ void FileClient::tryProcessLines()
             //进入下载状态后就退出，让 onReadyRead() 去消费二进制内容
             if(!isDownloadStart) return;
         }
+        else if(line.startsWith("UPLOAD_OK##"))
+        {
+            // UPLOAD_OK##fileName
+            QString fn = QString::fromUtf8(line).section("##", 1, 1).trimmed();
+
+            QMessageBox::information(mainWindow, "提示", "上传完成：" + fn);
+
+            // 最稳：收到服务端确认后再刷新
+            requestList();
+        }
         else
         {
             //预留：留言/收藏等命令
@@ -102,18 +113,16 @@ void FileClient::uploadFile(QString filePath)
         return;
     }
 
+    // 先发头（必须带 '\n'，让服务端进入上传状态）
     QString head = QString("UPLOAD##%1##%2\n").arg(fileName).arg(fileSize);
 
     tcpSocket->write(head.toUtf8());
 
+    // 再发二进制
     while(!file.atEnd())
     {
         tcpSocket->write(file.read(4096));
     }
-
-    QMessageBox::information(mainWindow, "提示", "上传完成");
-
-    requestList();
 }
 
 //向服务端发送请求列表
@@ -133,7 +142,7 @@ void FileClient::downloadFile(QString fileName)
 void FileClient::handleList(QByteArray data)
 {
     QStringList list = QString::fromUtf8(data).split("##");
-    list.removeFirst();
+    list.removeFirst(); //去掉 "LIST"
 
     emit resourcesUpdated(list);
 }
