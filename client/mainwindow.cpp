@@ -63,6 +63,13 @@ void MainWindow::refreshList(const QStringList &list)
     ui->listWidget->addItems(list);
 }
 
+void MainWindow::setSession(const UserSession &s)
+{
+    //只做“显示”，不在这里做登录逻辑
+    ui->username->setText(s.username);
+    //头像后续再加：可以用 s.avatar 决定是否下载/显示
+}
+
 MainWindow::~MainWindow()
 {
     delete ui;

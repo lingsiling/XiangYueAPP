@@ -126,15 +126,18 @@ void LogDialog::processLines()
         else if (msg.startsWith("LOGIN_OK##")) {
             // LOGIN_OK##userId##username##avatar
             QStringList p = msg.split("##");
-            QString userId = p.value(1);
-            QString username = p.value(2);
-            QString avatar = p.value(3);
+
+            UserSession s;
+            s.userId = p.value(1).toLongLong();
+            s.username = p.value(2);
+            s.avatar = p.value(3);
 
             // 登录成功后：不允许 LogDialog 再读 socket（否则会抢包）
             disconnect(m_readyReadConn);
 
             // 登录成功才进入主界面
             MainWindow *w = new MainWindow(nullptr, tcpSocket);
+            w->setSession(s);   // 注入用户会话信息
             w->show();
 
             //这里后面可以扩展：把 userId/username/avatar 传给 MainWindow 显示

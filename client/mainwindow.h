@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include  "resourcesearch.h"
+#include "usersession.h"
 #include <QMainWindow>
 #include <QTcpSocket>
 #include <QFile>
@@ -20,6 +21,7 @@ public:
     ~MainWindow();
 
     void sendData();//发送文件函数
+    void setSession(const UserSession &s);   //登录成功后注入会话信息
 
 protected:
     Ui::MainWindow *ui;
