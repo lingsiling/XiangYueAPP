@@ -69,9 +69,31 @@ void FileClient::tryProcessLines()
             // 最稳：收到服务端确认后再刷新
             requestList();
         }
+        else if (line.startsWith("COMMENT_BEGIN##"))
+        {
+            handleCommentBegin(line);
+        }
+        else if (line.startsWith("COMMENT_ITEM##"))
+        {
+            handleCommentItem(line);
+        }
+        else if (line.startsWith("COMMENT_END##"))
+        {
+            handleCommentEnd(line);
+        }
+        else if (line.startsWith("COMMENT_ADD_OK##"))
+        {
+            const qint64 id = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+            emit commentAddOk(id);
+        }
+        else if (line.startsWith("COMMENT_ADD_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit commentAddFail(reason);
+        }
         else
         {
-            //预留：留言/收藏等命令
+            //预留：收藏等命令
         }
     }
 }
@@ -176,4 +198,76 @@ void FileClient::handleDownload(QByteArray data)
 
     //进入下载状态：后续缓冲区内容按 size 写入
     isDownloadStart = false;
+}
+
+//添加 Base64 工具
+QString FileClient::toB64(const QString &s)
+{
+    return QString::fromUtf8(s.toUtf8().toBase64());
+}
+
+QString FileClient::fromB64(const QString &b64)
+{
+    return QString::fromUtf8(QByteArray::fromBase64(b64.toUtf8()));
+}
+
+void FileClient::requestComments(const QString &resourceName)
+{
+    const QString rn = resourceName.trimmed();
+    if (rn.isEmpty()) return;
+
+    //  行协议：服务端会返回 COMMENT_BEGIN/ITEM/END
+    const QString cmd = QString("COMMENT_LIST##%1\n").arg(rn);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::addComment(qint64 userId, const QString &resourceName, const QString &content)
+{
+    const QString rn = resourceName.trimmed();
+    if (userId <= 0 || rn.isEmpty()) return;
+
+    // content 允许换行/中文/特殊字符，必须 base64 避免破坏按行解析
+    const QString contentB64 = toB64(content);
+    const QString cmd = QString("COMMENT_ADD##%1##%2##%3\n").arg(userId).arg(rn).arg(contentB64);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::handleCommentBegin(const QByteArray &line)
+{
+    // COMMENT_BEGIN##resourceName
+    m_commentResource = QString::fromUtf8(line).section("##", 1).trimmed();
+    m_pendingComments.clear();
+}
+
+void FileClient::handleCommentItem(const QByteArray &line)
+{
+    // COMMENT_ITEM##commentId##userId##username_b64##createdAt_b64##content_b64
+    const QString s = QString::fromUtf8(line);
+
+    CommentDto c;
+    c.id = s.section("##", 1, 1).toLongLong();
+    c.userId = s.section("##", 2, 2).toLongLong();
+
+    const QString usernameB64  = s.section("##", 3, 3);
+    const QString createdAtB64 = s.section("##", 4, 4);
+    const QString contentB64   = s.section("##", 5); // 余下全部是 content_b64
+
+    c.username  = fromB64(usernameB64);
+    c.createdAt = fromB64(createdAtB64);
+    c.content   = fromB64(contentB64); // 这里会还原多行文本
+
+    m_pendingComments.push_back(c);
+}
+
+void FileClient::handleCommentEnd(const QByteArray &line)
+{
+    // COMMENT_END##resourceName
+    const QString rn = QString::fromUtf8(line).section("##", 1).trimmed();
+
+    //只在匹配的批次结束时发信号（避免并发时乱序；目前是单 socket 单请求，已经够用）
+    if (rn == m_commentResource)
+        emit commentsUpdated(rn, m_pendingComments);
+
+    m_commentResource.clear();
+    m_pendingComments.clear();
 }

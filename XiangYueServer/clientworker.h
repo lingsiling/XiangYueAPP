@@ -2,6 +2,7 @@
 #ifndef CLIENTWORKER_H
 #define CLIENTWORKER_H
 
+#include <QFileInfo>
 #include <QObject>
 #include <QTcpSocket>
 #include <QFile>
@@ -42,6 +43,14 @@ private:
     void handleLogin(const QString &line);
 
     void handleGetAvatar(qint64 userId);
+
+    void handleCommentList(const QString &line);
+    void handleCommentAdd(const QString &line);
+
+    // Base64 工具：
+    // 行协议用 '\n' 结尾，content 允许换行/任意字符，所以传输时必须编码避免破坏按行解析。
+    static QString toB64(const QString &s);
+    static QString fromB64(const QString &b64);
 
 private:
     qintptr m_sd;

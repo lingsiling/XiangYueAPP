@@ -1,56 +1,127 @@
 # XiangYueAPP / XiangYueServer（学习资源共享平台）
 
-一个基于 Qt Widgets + TCP 的简单“资源共享平台”示例项目，包含：
-- **客户端（XiangYueAPP）**：登录/注册、资源列表、上传、下载
-- **服务端（XiangYueServer）**：多线程接入、文件保存、SQLite 用户表（注册/登录）
+一个基于 **Qt Widgets + TCP** 的简单“资源共享平台”示例项目，包含：
+- **客户端（XiangYueAPP）**：登录/注册、资源列表、搜索、上传、下载、资源详情（评论区、下载）
+- **服务端（XiangYueServer）**：多线程接入、文件保存、SQLite（用户/评论等）
 
-> 协议为“文本行协议 + 二进制数据流”混合模式：控制指令以 `\n` 结尾，文件内容按 size 精确收发。
+> 协议为“**文本行协议 + 二进制数据流**”混合模式：控制指令以 `\n` 结尾，文件内容按 size 精确收发。
 
 ---
 
 ## 目录结构（核心文件）
 
 ### Client
-- `logdialog.*`：登录/注册界面；登录成功后把同一个 `QTcpSocket*` 交给主界面使用
-- `mainwindow.*`：主界面，显示资源列表、触发上传、打开资源详情对话框
-- `fileclient.*`：客户端网络逻辑（LIST/UPLOAD/DOWNLOAD/FILE 接收解析）
+- `logdialog.*`：登录/注册界面；登录成功后将同一个 `QTcpSocket*` 交给主界面使用（避免重复连接）
+- `usersession.*`：登录后的“用户会话信息”（`userId/username/avatar`），用于解耦 UI 模块
+- `mainwindow.*`：主界面（用户名、头像、资源列表、搜索、上传、打开资源详情）
+- `resourcedetaildialog.*`：资源详情对话框（下载、评论区显示与发送）
+- `fileclient.*`：客户端网络逻辑（LIST/UPLOAD/DOWNLOAD/FILE/评论等协议解析）
+- `resourcesearch.*`：资源搜索逻辑（与 UI 分离）
 
 ### Server
 - `threadedtcpserver.*`：继承 `QTcpServer`，在 `incomingConnection()` 中拿到 `socketDescriptor`
 - `clientworker.*`：每个连接对应一个 worker + 独立线程；内部创建 `QTcpSocket` 并接管 descriptor
-- `dbmanager.*`：SQLite 初始化、建表
+- `dbmanager.*`：SQLite 初始化、建表/索引
 - `authservice.* / userrepository.*`：注册/登录业务层与数据访问层
+- `commentservice.* / commentrepository.* / commentrecord.h`：评论业务层与数据访问层（低耦合）
 
 ---
 
 ## 通信协议（简化说明）
 
-所有**控制消息**一律以 `\n` 结尾（便于按行拆包）：
+所有**控制消息**一律以 `\n` 结尾（便于按行拆包）。
 
 ### 客户端 -> 服务端
-- 请求列表：
+- 请求资源列表：
   - `LIST\n`
-- 下载：
+- 下载资源文件：
   - `DOWNLOAD##fileName\n`
-- 上传：
+- 上传资源文件：
   - 先发头：`UPLOAD##fileName##fileSize\n`
   - 再紧跟发送 `fileSize` 字节二进制内容
+- 注册：
+  - `REGISTER##username##password\n`
+- 登录：
+  - `LOGIN##username##password\n`
+- 获取头像（复用 FILE 传输）：
+  - `GET_AVATAR##userId\n`
 
-### 服务端 -> 客户端
+#### 评论（content 支持换行）
+由于评论内容允许换行和特殊字符，协议中 `content` 统一用 **Base64** 表示（避免破坏按行解析/分隔符解析）：
+
+- 拉取某资源的评论列表：
+  - `COMMENT_LIST##resourceName\n`
+- 发送评论：
+  - `COMMENT_ADD##userId##resourceName##content_b64\n`
+
+> `content_b64 = base64(UTF-8(content))`
+
+---
+
+### 服务    -> 客户端
 - 资源列表：
   - `LIST##f1##f2##f3...\n`
-- 下载响应：
+- 下载响应（资源文件 / 头像文件都走该协议）：
   - 先发头：`FILE##fileName##fileSize\n`
   - 再紧跟发送 `fileSize` 字节二进制内容
 - 上传完成确认：
   - `UPLOAD_OK##fileName\n`
+- 登录成功：
+  - `LOGIN_OK##userId##username##avatar\n`
+- 登录失败：
+  - `LOGIN_FAIL##reason\n`
+
+#### 评论列表返回（分批多行）
+- `COMMENT_BEGIN##resourceName\n`
+- `COMMENT_ITEM##commentId##userId##username_b64##createdAt_b64##content_b64\n`
+- `COMMENT_END##resourceName\n`
+
+发送评论结果：
+- `COMMENT_ADD_OK##commentId\n`
+- `COMMENT_ADD_FAIL##reason\n`
+
+---
+
+## 头像流程说明（客户端显示头像）
+
+- 服务端 `users.avatar` 存储头像相对路径字符串（例如 `avatars/default.png`）
+- 客户端登录成功后进入主界面：
+  1. `LogDialog` 解析 `LOGIN_OK##userId##username##avatar`
+  2. 把 `UserSession` 注入 `MainWindow`
+  3. `MainWindow` 发送 `GET_AVATAR##userId\n`
+  4. 服务端读取头像文件并以 `FILE##...` 返回
+  5. `FileClient` 复用已有下载逻辑保存到 `ClientSave/` 并发出 `fileReceived(...)`
+  6. `MainWindow` 接收 `fileReceived(...)` 并用 `QPixmap` 更新头像 `QLabel`
+
+> 为避免干扰用户，头像文件名以 `avatar_` 前缀回传时，客户端不会弹出“下载完成”提示。
+
+---
+
+## 评论功能流程说明（支持换行）
+
+1. 用户打开资源详情页：
+   - `ResourceDetailDialog` 调用 `FileClient::requestComments(resourceName)`
+   - 客户端发 `COMMENT_LIST##resourceName\n`
+2. 服务端查询 SQLite `comments` 表并返回：
+   - `COMMENT_BEGIN` + 多条 `COMMENT_ITEM` + `COMMENT_END`
+   - `username/createdAt/content` 都是 base64 字段
+3. 客户端 `FileClient` 收齐后 emit：
+   - `commentsUpdated(resourceName, comments)`
+4. 详情页刷新评论列表，显示格式：
+   - `用户名  时间`
+   - `内容（可多行）`
+
+发送评论：
+- `ResourceDetailDialog` 读取 `textEditComment` 的多行文本
+- `FileClient` 将内容 base64 编码后发送 `COMMENT_ADD`
+- 成功后自动重新拉取评论列表刷新显示
 
 ---
 
 ## 多线程模型（服务端）
 
 - 主线程仅负责 `listen()` + `incomingConnection()`
-- 每个连接创建一个 `QThread`
+- 每个连  创建一个 `QThread`
 - `ClientWorker` **moveToThread** 后，在子线程中创建 `QTcpSocket`，并调用 `setSocketDescriptor()`
 - 每个 worker 内维护独立的：
   - 接收缓冲区 `m_buf`
@@ -62,18 +133,31 @@
 
 ---
 
+## 数据库（SQLite）
+
+数据库由服务端启动时初始化（建表/索引）：
+- `users`：用户信息（username/password_hash/salt/avatar/created_at）
+- `comments`：评论（resource_name/user_id/content/created_at）
+- 以及预留的 `resources/uploads/favorites` 表（用于后续扩展）
+
+数据库路径示例：
+- `D:/Qt/Projects/XiangYueAPP/database/xiangyue.db`
+
+---
+
 ## 运行方式
 
 ### 1. 启动服务端
 - 打开 `XiangYueServer.pro`
 - 运行后监听端口：`7777`
 - 文件保存目录（示例）：`D:/Qt/Projects/XiangYueAPP/ServerSave/`
-- SQLite 数据库（示例）：`D:/Qt/Projects/XiangYueAPP/database/xiangyue.db`
+- 头像目录（示例）：`D:/Qt/Projects/XiangYueAPP/ServerAvatars/`
+  - 需要准备默认头像文件：`default.png`
 
 ### 2. 启动客户端
 - 打开 `XiangYueAPP.pro`
 - 默认连接：`127.0.0.1:7777`
-- 登录成功后进入主界面，自动请求资源列表
+- 登录成功后进入主界面，自动请求资源列表、请求头像
 
 ---
 
@@ -84,6 +168,9 @@
 
 2. **同一个 socket 的 readyRead 只能有一个模块消费**
    - 登录界面登录成功后必须断开自己的 `readyRead`，避免和主界面抢包。
+
+3. **评论内容使用 Base64**
+   - 这是为了支持换行与任意字符，并保持“按行协议”解析稳定。
 
 ---
 

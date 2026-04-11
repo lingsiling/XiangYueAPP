@@ -155,5 +155,24 @@ bool DBManager::initSchema()
         ON favorites(user_id);
     )SQL", "create idx_favorites_user")) return false;
 
+    //comments：资源评论/留言
+    //- content 允许换行，直接存 TEXT
+    //- resource_name 先用“文件名”作为资源标识，后续如果 resources 表稳定维护，可迁移为 resource_id
+    if (!execOrLog(R"SQL(
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            resource_name TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    )SQL", "create comments")) return false;
+
+    // 常用查询索引：按资源名拉评论列表
+    if (!execOrLog(R"SQL(
+        CREATE INDEX IF NOT EXISTS idx_comments_resource
+        ON comments(resource_name);
+    )SQL", "create idx_comments_resource")) return false;
+
     return true;
 }

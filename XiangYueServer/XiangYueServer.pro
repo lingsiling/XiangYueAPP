@@ -9,6 +9,8 @@ CONFIG += c++17
 SOURCES += \
     authservice.cpp \
     clientworker.cpp \
+    commentrepository.cpp \
+    commentservice.cpp \
     dbmanager.cpp \
     main.cpp \
     serverwidget.cpp \
@@ -18,6 +20,9 @@ SOURCES += \
 HEADERS += \
     authservice.h \
     clientworker.h \
+    commentrecord.h \
+    commentrepository.h \
+    commentservice.h \
     dbmanager.h \
     serverwidget.h \
     threadedtcpserver.h \

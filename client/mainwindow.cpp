@@ -65,7 +65,7 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         QString resourceName = item->text();
         // 打开资源详情对话框（模态）
         // 这里把资源名、fileClient 传给详情页，详情页里点“下载”再触发下载
-        ResourceDetailDialog dlg(this, resourceName, fileClient);
+        ResourceDetailDialog dlg(this, resourceName, fileClient, m_session.userId);
         dlg.exec();
     });
 }

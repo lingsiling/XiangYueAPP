@@ -2,7 +2,8 @@
 #include "clientworker.h"
 #include "authservice.h"
 #include "dbmanager.h"
-
+#include "commentservice.h"
+#include <QByteArray>
 #include <QDir>
 #include <QDebug>
 #include <QThread>
@@ -126,8 +127,16 @@ void ClientWorker::tryProcessLines()
             const qint64 uid = line.section("##", 1, 1).toLongLong();
             handleGetAvatar(uid);
         }
+        else if (line.startsWith("COMMENT_LIST##"))
+        {
+            handleCommentList(line);
+        }
+        else if (line.startsWith("COMMENT_ADD##"))
+        {
+            handleCommentAdd(line);
+        }
         else {
-            //预留：收藏/评论/我的上传
+            //预留：收藏/我的上传
         }
     }
 }
@@ -256,4 +265,65 @@ void ClientWorker::handleGetAvatar(qint64 userId)
     m_socket->write(head.toUtf8());
     while (!f.atEnd())
         m_socket->write(f.read(4096));
+}
+
+//Base64 工具实现
+QString ClientWorker::toB64(const QString &s)
+{
+    return QString::fromUtf8(s.toUtf8().toBase64());
+}
+QString ClientWorker::fromB64(const QString &b64)
+{
+    return QString::fromUtf8(QByteArray::fromBase64(b64.toUtf8()));
+}
+
+void ClientWorker::handleCommentList(const QString &line)
+{
+    const QString resourceName = line.section("##", 1, 1).trimmed();
+
+    CommentService service;
+    auto res = service.listComments(resourceName);
+
+    if (!res.ok) {
+        //也可以选择发 COMMENT_FAIL；这里先用 begin/end 返回空列表更简单
+        m_socket->write(QString("COMMENT_BEGIN##%1\n").arg(resourceName).toUtf8());
+        m_socket->write(QString("COMMENT_END##%1\n").arg(resourceName).toUtf8());
+        return;
+    }
+
+    //分批多行返回：BEGIN -> ITEM... -> END
+    m_socket->write(QString("COMMENT_BEGIN##%1\n").arg(resourceName).toUtf8());
+
+    for (const auto &c : res.items)
+    {
+        // username/createdAt/content 全部 base64，避免中文/换行/分隔符影响行协议
+        const QString msg = QString("COMMENT_ITEM##%1##%2##%3##%4##%5\n")
+                                .arg(c.id)
+                                .arg(c.userId)
+                                .arg(toB64(c.username))
+                                .arg(toB64(c.createdAt))
+                                .arg(toB64(c.content));
+        m_socket->write(msg.toUtf8());
+    }
+
+    m_socket->write(QString("COMMENT_END##%1\n").arg(resourceName).toUtf8());
+}
+
+void ClientWorker::handleCommentAdd(const QString &line)
+{
+    // COMMENT_ADD##userId##resourceName##content_b64
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+    const QString resourceName = line.section("##", 2, 2).trimmed();
+    const QString contentB64 = line.section("##", 3); // 从第3段开始到末尾（content 可能包含 ## 的 b64 不会含 #，但这样更稳）
+
+    const QString content = fromB64(contentB64);
+
+    CommentService service;
+    auto res = service.addComment(userId, resourceName, content);
+
+    if (res.ok) {
+        m_socket->write(QString("COMMENT_ADD_OK##%1\n").arg(res.commentId).toUtf8());
+    } else {
+        m_socket->write(QString("COMMENT_ADD_FAIL##%1\n").arg(res.reason).toUtf8());
+    }
 }
