@@ -23,6 +23,8 @@ public:
     // 根据 username 查询用户；不存在返回 nullopt
     std::optional<UserRecord> findByUsername(const QString &username);
 
+    std::optional<UserRecord> findById(qint64 id);
+
     // 插入新用户；成功返回 true；失败（如 username 冲突）返回 false
     bool insertUser(const QString &username,
                     const QString &passwordHash,

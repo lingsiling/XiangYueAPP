@@ -76,14 +76,17 @@ void ClientWorker::tryProcessLines()
 
         const QString line = QString::fromUtf8(raw).trimmed();
 
-        if (line == "LIST") {
+        if (line == "LIST")
+        {
             sendFileList();
         }
-        else if (line.startsWith("DOWNLOAD##")) {
+        else if (line.startsWith("DOWNLOAD##"))
+        {
             const QString fn = line.section("##", 1, 1).trimmed();
             sendFile(fn);
         }
-        else if (line.startsWith("UPLOAD##")) {
+        else if (line.startsWith("UPLOAD##"))
+        {
             // UPLOAD##fileName##fileSize
             QStringList p = line.split("##");
             m_uploadFileName = p.value(1).trimmed();
@@ -98,7 +101,8 @@ void ClientWorker::tryProcessLines()
             {
                 qDebug() << "[Worker] open upload file failed:" << path;
                 m_isUploadIdle = true;
-            } else
+            }
+            else
             {
                 qDebug() << "[Worker] upload start:" << m_uploadFileName
                          << "size=" << m_uploadFileSize
@@ -116,6 +120,11 @@ void ClientWorker::tryProcessLines()
         else if (line.startsWith("LOGIN##"))
         {
             handleLogin(line);
+        }
+        else if (line.startsWith("GET_AVATAR##"))
+        {
+            const qint64 uid = line.section("##", 1, 1).toLongLong();
+            handleGetAvatar(uid);
         }
         else {
             //预留：收藏/评论/我的上传
@@ -201,11 +210,50 @@ void ClientWorker::handleLogin(const QString &line)
 
     if (res.ok) {
         const QString msg = QString("LOGIN_OK##%1##%2##%3\n")
-        .arg(res.userId)
+            .arg(res.userId)
             .arg(res.username)
             .arg(res.avatar);
         m_socket->write(msg.toUtf8());
     } else {
         m_socket->write(QString("LOGIN_FAIL##%1\n").arg(res.reason).toUtf8());
     }
+}
+
+void ClientWorker::handleGetAvatar(qint64 userId)
+{
+    //头像文件不放数据库，只在 users.avatar 存相对路径（如 avatars/user_12.png）
+    //服务端统一从 m_avatarDir 下读取，避免任意路径访问风险
+
+    UserRepository repo;
+    auto recOpt = repo.findById(userId);
+    if (!recOpt.has_value())
+    {
+        m_socket->write("AVATAR_FAIL##USER_NOT_FOUND\n");
+        return;
+    }
+
+    QString avatarRel = recOpt->avatar; //例子"avatars/default.png"
+    if (avatarRel.isEmpty())
+        avatarRel = "avatars/default.png";
+
+    //只取文件名，防止 avatarRel 被注入 "../"
+    const QString avatarFileName = QFileInfo(avatarRel).fileName();
+    const QString path = QDir(m_avatarDir).filePath(avatarFileName);
+
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+    {
+        m_socket->write("AVATAR_FAIL##FILE_NOT_FOUND\n");
+        return;
+    }
+
+    //复用已有的 FILE 协议，客户端 FileClient 不用新增解析逻辑
+    const qint64 size = f.size();
+    // 让客户端能识别这是头像文件，避免弹“下载完成”
+    const QString outName = QString("avatar_%1_%2").arg(userId).arg(avatarFileName);
+    // 例：avatar_12_default.png 或 avatar_12_user_12.png
+    const QString head = QString("FILE##%1##%2\n").arg(outName).arg(size);
+    m_socket->write(head.toUtf8());
+    while (!f.atEnd())
+        m_socket->write(f.read(4096));
 }

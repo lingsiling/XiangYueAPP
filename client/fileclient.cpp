@@ -93,7 +93,13 @@ void FileClient::consumeDownloadData()
     {
         file.close();
         isDownloadStart = true;
-        QMessageBox::information(mainWindow, "完成", "下载完成");
+
+        // 通知 UI：某个文件已接收完成（头像也走这里）
+        emit fileReceived(fileName, file.fileName());
+
+        // 头像文件不弹提示（避免干扰用户）
+        if (!fileName.startsWith("avatar_"))
+            QMessageBox::information(mainWindow, "完成", "下载完成");
     }
 }
 

@@ -29,6 +29,28 @@ std::optional<UserRecord> UserRepository::findByUsername(const QString &username
     return u;
 }
 
+std::optional<UserRecord> UserRepository::findById(qint64 id)
+{
+    QSqlQuery q(DBManager::instance().db());
+    q.prepare("SELECT id, username, password_hash, salt, avatar FROM users WHERE id=?");
+    q.addBindValue(id);
+
+    if (!q.exec()) {
+        qDebug() << "[UserRepo] findById exec failed:" << q.lastError().text();
+        return std::nullopt;
+    }
+    if (!q.next())
+        return std::nullopt;
+
+    UserRecord u;
+    u.id = q.value(0).toLongLong();
+    u.username = q.value(1).toString();
+    u.passwordHash = q.value(2).toString();
+    u.salt = q.value(3).toString();
+    u.avatar = q.value(4).toString();
+    return u;
+}
+
 bool UserRepository::insertUser(const QString &username,
                                 const QString &passwordHash,
                                 const QString &salt,

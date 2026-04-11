@@ -41,6 +41,8 @@ private:
     void handleRegister(const QString &line);
     void handleLogin(const QString &line);
 
+    void handleGetAvatar(qint64 userId);
+
 private:
     qintptr m_sd;
     QTcpSocket *m_socket = nullptr;
@@ -56,6 +58,8 @@ private:
 
     QString m_saveDir = "D:/Qt/Projects/XiangYueAPP/ServerSave/";
     QString m_dbPath  = "D:/Qt/Projects/XiangYueAPP/database/xiangyue.db";
+
+    QString m_avatarDir = "D:/Qt/Projects/XiangYueAPP/ServerAvatars/"; //头像保存目录
 };
 
 #endif // CLIENTWORKER_H

@@ -29,6 +29,8 @@ protected:
 private:
     ResourceSearch m_search;        //搜索逻辑
     QStringList m_allResources;     //全量资源（服务端 LIST）
+    UserSession m_session;
+    void requestAvatarIfNeeded();
     void refreshList(const QStringList &list); //刷新UI
 private:
     QTcpSocket *tcpSocket;//通信套接字

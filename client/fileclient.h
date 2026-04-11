@@ -44,6 +44,7 @@ private:
 
 signals:
     void resourcesUpdated(const QStringList &list); //服务端列表更新时发出
+    void fileReceived(const QString &fileName, const QString &localPath); //任何 FILE 下载完成通知
 
 private:
     void handleDownload(QByteArray data); //下载处理

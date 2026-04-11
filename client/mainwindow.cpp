@@ -20,6 +20,19 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     //进入自动请求列表
     fileClient->requestList();
 
+    //连接 fileReceived 更新 QLabel（只处理头像文件名）
+    connect(fileClient, &FileClient::fileReceived, this, [=](const QString &fn, const QString &localPath){
+        // 简单判定：头像文件一般是 png/jpg；也可以只允许 user_*.png
+        if (fn.endsWith(".png", Qt::CaseInsensitive) ||
+            fn.endsWith(".jpg", Qt::CaseInsensitive) ||
+            fn.endsWith(".jpeg", Qt::CaseInsensitive))
+        {
+            QPixmap pix(localPath);
+            if (!pix.isNull())
+                ui->avatar->setPixmap(pix.scaled(ui->avatar->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        }
+    });
+
     //接收服务端列表更新
     connect(fileClient, &FileClient::resourcesUpdated, this, [=](const QStringList &list){
         m_allResources = list;
@@ -66,8 +79,21 @@ void MainWindow::refreshList(const QStringList &list)
 void MainWindow::setSession(const UserSession &s)
 {
     //只做“显示”，不在这里做登录逻辑
+    m_session = s;
+
     ui->username->setText(s.username);
-    //头像后续再加：可以用 s.avatar 决定是否下载/显示
+
+    requestAvatarIfNeeded();
+}
+
+void MainWindow::requestAvatarIfNeeded()
+{
+    if (!tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState)
+        return;
+
+    //头像下载复用 FILE 机制，所以直接让服务端发 FILE##... 回来
+    const QString cmd = QString("GET_AVATAR##%1\n").arg(m_session.userId);
+    tcpSocket->write(cmd.toUtf8());
 }
 
 MainWindow::~MainWindow()
