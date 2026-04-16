@@ -47,6 +47,8 @@ private:
     void handleCommentList(const QString &line);
     void handleCommentAdd(const QString &line);
 
+    void handleCommentDel(const QString &line);
+
     // Base64 工具：
     // 行协议用 '\n' 结尾，content 允许换行/任意字符，所以传输时必须编码避免破坏按行解析。
     static QString toB64(const QString &s);

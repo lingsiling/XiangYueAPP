@@ -48,3 +48,38 @@ CommentService::ListResult CommentService::listComments(const QString &resourceN
     r.ok = true;
     return r;
 }
+
+CommentService::DeleteResult CommentService::deleteComment(qint64 userId, qint64 commentId)
+{
+    DeleteResult r;
+
+    if (userId <= 0 || commentId <= 0) {
+        r.ok = false;
+        r.reason = "INVALID_FORMAT";
+        return r;
+    }
+
+    // 先查是否存在
+    auto recOpt = m_repo.findById(commentId);
+    if (!recOpt.has_value()) {
+        r.ok = false;
+        r.reason = "NOT_FOUND";
+        return r;
+    }
+
+    // 权限校验：只能删除自己发布的评论
+    if (recOpt->userId != userId) {
+        r.ok = false;
+        r.reason = "NOT_OWNER";
+        return r;
+    }
+
+    if (!m_repo.deleteById(commentId)) {
+        r.ok = false;
+        r.reason = "SERVER_ERROR";
+        return r;
+    }
+
+    r.ok = true;
+    return r;
+}

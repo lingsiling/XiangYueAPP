@@ -24,8 +24,14 @@ public:
         QList<CommentRecord> items;
     };
 
+    struct DeleteResult {
+        bool ok = false;
+        QString reason;  // INVALID_FORMAT / NOT_FOUND / NOT_OWNER / SERVER_ERROR
+    };
+
     AddResult addComment(qint64 userId, const QString &resourceName, const QString &content);
     ListResult listComments(const QString &resourceName);
+    DeleteResult deleteComment(qint64 userId, qint64 commentId);
 
 private:
     CommentRepository m_repo;

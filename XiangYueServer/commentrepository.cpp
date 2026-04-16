@@ -57,3 +57,44 @@ QList<CommentRecord> CommentRepository::listByResource(const QString &resourceNa
     }
     return out;
 }
+
+std::optional<CommentRecord> CommentRepository::findById(qint64 commentId)
+{
+    QSqlQuery q(DBManager::instance().db());
+    q.prepare(R"SQL(
+        SELECT c.id, c.resource_name, c.user_id, IFNULL(u.username,''), c.created_at, c.content
+        FROM comments c
+        LEFT JOIN users u ON u.id = c.user_id
+        WHERE c.id = ?
+    )SQL");
+    q.addBindValue(commentId);
+
+    if (!q.exec()) {
+        qDebug() << "[CommentRepo] findById failed:" << q.lastError().text();
+        return std::nullopt;
+    }
+    if (!q.next())
+        return std::nullopt;
+
+    CommentRecord r;
+    r.id = q.value(0).toLongLong();
+    r.resourceName = q.value(1).toString();
+    r.userId = q.value(2).toLongLong();
+    r.username = q.value(3).toString();
+    r.createdAt = q.value(4).toString();
+    r.content = q.value(5).toString();
+    return r;
+}
+
+bool CommentRepository::deleteById(qint64 commentId)
+{
+    QSqlQuery q(DBManager::instance().db());
+    q.prepare("DELETE FROM comments WHERE id=?");
+    q.addBindValue(commentId);
+
+    if (!q.exec()) {
+        qDebug() << "[CommentRepo] deleteById failed:" << q.lastError().text();
+        return false;
+    }
+    return true;
+}

@@ -91,6 +91,16 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit commentAddFail(reason);
         }
+        else if (line.startsWith("COMMENT_DEL_OK##"))
+        {
+            const qint64 id = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+            emit commentDelOk(id);
+        }
+        else if (line.startsWith("COMMENT_DEL_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit commentDelFail(reason);
+        }
         else
         {
             //预留：收藏等命令
@@ -270,4 +280,13 @@ void FileClient::handleCommentEnd(const QByteArray &line)
 
     m_commentResource.clear();
     m_pendingComments.clear();
+}
+
+void FileClient::deleteComment(qint64 userId, qint64 commentId)
+{
+    if (userId <= 0 || commentId <= 0) return;
+
+    //行协议：删除评论（服务端会做“只能删除自己的”强校验）
+    const QString cmd = QString("COMMENT_DEL##%1##%2\n").arg(userId).arg(commentId);
+    tcpSocket->write(cmd.toUtf8());
 }

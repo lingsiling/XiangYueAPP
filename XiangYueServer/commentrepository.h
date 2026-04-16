@@ -11,13 +11,16 @@
 class CommentRepository
 {
 public:
-    // 插入评论，成功返回 commentId，失败返回 nullopt
+    //插入评论，成功返回 commentId，失败返回 nullopt
     std::optional<qint64> insert(const QString &resourceName,
                                  qint64 userId,
                                  const QString &content);
 
-    // 根据资源名拉取评论列表（包含 username），默认最新在上
+    //根据资源名拉取评论列表（包含 username），默认最新在上
     QList<CommentRecord> listByResource(const QString &resourceName);
+
+    std::optional<CommentRecord> findById(qint64 commentId);
+    bool deleteById(qint64 commentId);
 };
 
 #endif // COMMENTREPOSITORY_H

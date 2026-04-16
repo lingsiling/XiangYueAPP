@@ -44,6 +44,8 @@ public:
     //评论相关（UI 只调这些接口，不关心协议
     void requestComments(const QString &resourceName);
     void addComment(qint64 userId, const QString &resourceName, const QString &content);
+    // 删除评论：UI 只传 userId/commentId，不关心行协议细节
+    void deleteComment(qint64 userId, qint64 commentId);
 private:
     //接收缓冲区：解决TCP粘包/拆包（命令行、FILE头）
     QByteArray m_buf;
@@ -70,6 +72,9 @@ signals:
 
     void commentAddOk(qint64 commentId);
     void commentAddFail(const QString &reason);
+
+    void commentDelOk(qint64 commentId);
+    void commentDelFail(const QString &reason);
 
 private:
     void handleDownload(QByteArray data); //下载处理

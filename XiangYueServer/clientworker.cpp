@@ -135,6 +135,10 @@ void ClientWorker::tryProcessLines()
         {
             handleCommentAdd(line);
         }
+        else if (line.startsWith("COMMENT_DEL##"))
+        {
+            handleCommentDel(line);
+        }
         else {
             //预留：收藏/我的上传
         }
@@ -325,5 +329,21 @@ void ClientWorker::handleCommentAdd(const QString &line)
         m_socket->write(QString("COMMENT_ADD_OK##%1\n").arg(res.commentId).toUtf8());
     } else {
         m_socket->write(QString("COMMENT_ADD_FAIL##%1\n").arg(res.reason).toUtf8());
+    }
+}
+
+void ClientWorker::handleCommentDel(const QString &line)
+{
+    // COMMENT_DEL##userId##commentId
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+    const qint64 commentId = line.section("##", 2, 2).toLongLong();
+
+    CommentService service;
+    auto res = service.deleteComment(userId, commentId);
+
+    if (res.ok) {
+        m_socket->write(QString("COMMENT_DEL_OK##%1\n").arg(commentId).toUtf8());
+    } else {
+        m_socket->write(QString("COMMENT_DEL_FAIL##%1\n").arg(res.reason).toUtf8());
     }
 }
