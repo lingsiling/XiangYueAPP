@@ -89,7 +89,7 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
 
     //删除结果：成功就刷新列表，失败就提示原因
     connect(m_fileClient, &FileClient::commentDelOk, this, [=](qint64){
-        // 最稳：删除成功后重新拉取一次，避免并发状态不一致
+        //删除成功后重新拉取一次，避免并发状态不一致
         m_fileClient->requestComments(m_resourceName);
     });
 
@@ -98,7 +98,7 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     });
 
     connect(m_fileClient, &FileClient::commentAddOk, this, [=](qint64){
-        // 发送成功：清空输入框，并刷新列表（最稳）
+        //发送成功：清空输入框，并刷新列表（最稳）
         ui->textEditComment->clear();
         m_fileClient->requestComments(m_resourceName);
     });

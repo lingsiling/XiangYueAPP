@@ -7,9 +7,9 @@
 #include <QTcpSocket>
 #include <QFile>
 
-// ClientWorker：一个连接一个 worker（运行在独立线程）
-// - QTcpSocket 必须在本线程创建（避免跨线程引擎错误）
-// - m_buf/上传状态都是“每连接一份”，并发不串线
+//ClientWorker：一个连接一个 worker（运行在独立线程）
+//QTcpSocket 必须在本线程创建（避免跨线程引擎错误）
+//m_buf/上传状态都是“每连接一份”，并发不串线
 class ClientWorker : public QObject
 {
     Q_OBJECT
@@ -17,11 +17,11 @@ public:
     explicit ClientWorker(qintptr socketDescriptor, QObject *parent = nullptr);
 
 signals:
-    // 通知 ThreadedTcpServer：worker 结束了，可以让线程退出
+    //通知 ThreadedTcpServer：worker 结束了，可以让线程退出
     void finished();
 
 public slots:
-    // 线程 started 后调用：创建 socket + 接管 descriptor + connect 信号
+    //线程 started 后调用：创建 socket + 接管 descriptor + connect 信号
     void start();
 
 private slots:
@@ -61,7 +61,7 @@ private:
     QByteArray m_buf;
 
     // 上传状态（每连接独立）
-    bool m_isUploadIdle = true;
+    bool m_isUploadIdle = true;    //true=空闲，可解析命令行；false=正在接收当前文件二进制
     QString m_uploadFileName;
     qint64 m_uploadFileSize = 0;
     qint64 m_uploadRecvSize = 0;

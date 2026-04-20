@@ -1,10 +1,14 @@
 /*
- * FileClient：客户端网络模块
- * 纯逻辑类
+ * FileClient：客户端网络模块（纯逻辑类）
  * 作用：
- * 1. 上传文件
+ * 1. 上传文件（支持多文件队列）
  * 2. 请求文件列表
  * 3. 下载文件
+ * 4. 评论/删除评论
+ *
+ * 设计要点（低耦合）：
+ * - UI 只调用 uploadFile()/uploadFiles()，不关心协议细节
+ * - FileClient 内部维护上传队列：一次只上传一个文件，等待服务端 UPLOAD_OK 再继续下一个
  */
 
 #ifndef FILECLIENT_H
@@ -15,10 +19,12 @@
 #include <QFile>
 #include <QTimer>
 #include <QVector>
+#include <QQueue>
+#include <QFileInfo>
 
 class MainWindow;
 
-// CommentDto：客户端用于展示的一条评论（已解码为明文，content 允许换行）
+//CommentDto：客户端用于展示的一条评论（已解码为明文，content 允许换行）
 struct CommentDto
 {
     qint64 id = 0;
@@ -37,21 +43,27 @@ public:
 
     //对外接口
     //资源文件相关
+    //单文件上传
     void uploadFile(QString filePath);
+
+    //多文件上传：把文件路径加入队列，按顺序逐个上传
+    void uploadFiles(const QStringList &filePaths);
     void requestList();
     void downloadFile(QString fileName);
 
-    //评论相关（UI 只调这些接口，不关心协议
+    //评论相关（UI 只调这些接口，不关心协议）
     void requestComments(const QString &resourceName);
     void addComment(qint64 userId, const QString &resourceName, const QString &content);
     // 删除评论：UI 只传 userId/commentId，不关心行协议细节
     void deleteComment(qint64 userId, qint64 commentId);
+
 private:
     //接收缓冲区：解决TCP粘包/拆包（命令行、FILE头）
     QByteArray m_buf;
 
-    QTcpSocket *tcpSocket;
-    MainWindow *mainWindow;//用来操作UI
+    QTcpSocket *tcpSocket = nullptr;
+    MainWindow *mainWindow = nullptr;//用来操作UI(提示框等等)
+
     //下载相关
     bool isDownloadStart = true; //是否开始接收文件
     QString fileName;
@@ -63,18 +75,20 @@ private:
     QString m_commentResource;
     QVector<CommentDto> m_pendingComments;
 
-signals:
-    void resourcesUpdated(const QStringList &list); //服务端列表更新时发出
-    void fileReceived(const QString &fileName, const QString &localPath); //任何 FILE 下载完成通知
+    //上传队列（多文件上传核心）
+    struct UploadTask {
+        QString path;      //本地路径
+        QString name;      //文件名（协议里用）
+        qint64 size = 0;   //文件大小
+    };
 
-    // 评论列表拉取完成（一次性返回，UI 刷新更简单）
-    void commentsUpdated(const QString &resourceName, const QVector<CommentDto> &comments);
+    QQueue<UploadTask> m_uploadQueue;   //等待上传的文件队列
+    QFile m_uploadFile;                 //当前正在上传的文件
+    bool m_isUploading = false;         //当前是否处于“等待服务端确认/正在发送”状态
 
-    void commentAddOk(qint64 commentId);
-    void commentAddFail(const QString &reason);
-
-    void commentDelOk(qint64 commentId);
-    void commentDelFail(const QString &reason);
+private:
+    //启动下一次上传（若队列为空则结束）
+    void startNextUpload();
 
 private:
     void handleDownload(QByteArray data); //下载处理
@@ -94,6 +108,22 @@ private:
     // content 允许换行，必须 base64 后再放入行协议
     static QString toB64(const QString &s);
     static QString fromB64(const QString &b64);
+
+signals:
+    void resourcesUpdated(const QStringList &list); //服务端列表更新时发出
+    void fileReceived(const QString &fileName, const QString &localPath); //任何 FILE 下载完成通知
+
+    // 评论列表拉取完成（一次性返回，UI 刷新更简单）
+    void commentsUpdated(const QString &resourceName, const QVector<CommentDto> &comments);
+
+    void commentAddOk(qint64 commentId);
+    void commentAddFail(const QString &reason);
+
+    void commentDelOk(qint64 commentId);
+    void commentDelFail(const QString &reason);
+
+    //统一日志出口：UI 只负责显示（低耦合）
+    void logLine(const QString &line);
 };
 
 #endif // FILECLIENT_H

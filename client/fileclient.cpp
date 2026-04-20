@@ -42,7 +42,7 @@ void FileClient::tryProcessLines()
     while(true)
     {
         int pos = m_buf.indexOf('\n');
-        if(pos < 0) break; // 不够一行
+        if(pos < 0) break; //不够一行
 
         QByteArray line = m_buf.left(pos); //不含 '\n'
         m_buf.remove(0, pos + 1);
@@ -64,10 +64,18 @@ void FileClient::tryProcessLines()
             // UPLOAD_OK##fileName
             QString fn = QString::fromUtf8(line).section("##", 1, 1).trimmed();
 
-            QMessageBox::information(mainWindow, "提示", "上传完成：" + fn);
+            emit logLine(QString("上传完成：%1").arg(fn));
 
-            // 最稳：收到服务端确认后再刷新
+            //收到服务端确认后再刷新
             requestList();
+
+            //多文件上传调度点
+            //当前文件已完成：关闭当前上传文件并启动下一个任务
+            if (m_uploadFile.isOpen())
+                m_uploadFile.close();
+
+            m_isUploading = false;
+            startNextUpload();
         }
         else if (line.startsWith("COMMENT_BEGIN##"))
         {
@@ -135,32 +143,91 @@ void FileClient::consumeDownloadData()
     }
 }
 
-//上传按钮实现(由mainwindow::ui的buttonUpLoad调用）
+//单文件上传：保持兼容（内部直接转到多文件上传）
 void FileClient::uploadFile(QString filePath)
 {
-    QFileInfo info(filePath);
+    uploadFiles(QStringList{filePath});
+}
 
-    QString fileName = info.fileName();
-    qint64 fileSize = info.size();
-
-    QFile file(filePath);
-    bool isOK = file.open(QIODevice::ReadOnly);
-    if(false == isOK)
+//多文件上传：把任务加入队列并启动
+void FileClient::uploadFiles(const QStringList &filePaths)
+{
+    int added = 0;
+    //低耦合：FileClient 只关心“路径能否打开/大小”，不关心 UI 选择逻辑
+    for (const QString &p : filePaths)
     {
-        qDebug()<<"只读打开文件失败 fileclient 101";
+        const QString path = p.trimmed();
+        if (path.isEmpty()) continue;
+
+        QFileInfo info(path);
+        if (!info.exists() || !info.isFile()) {
+            emit logLine(QString("跳过：不存在或不是文件：%1").arg(path));
+            continue;
+        }
+
+        UploadTask t;
+        t.path = path;
+        t.name = info.fileName();
+        t.size = info.size();
+
+        //简单过滤：空文件不能上传（也可以让服务端拒绝，但这里提前过滤掉，避免浪费上传时间）
+        if (t.size < 0) {
+            emit logLine(QString("跳过：文件大小异常：%1").arg(path));
+            continue;
+        }
+
+        m_uploadQueue.enqueue(t);
+        added++;
+    }
+
+    if (added > 0)
+        emit logLine(QString("已加入上传队列：%1 个文件").arg(added));
+
+    //如果当前没有在上传，则立即启动队列
+    if (!m_isUploading)
+        startNextUpload();
+}
+
+//启动队列中的下一个文件上传（一次只上传一个）
+void FileClient::startNextUpload()
+{
+    if (m_isUploading) return;
+    if (!tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState) {
+        emit logLine("上传失败：未连接服务器");
         return;
     }
 
-    // 先发头（必须带 '\n'，让服务端进入上传状态）
-    QString head = QString("UPLOAD##%1##%2\n").arg(fileName).arg(fileSize);
+    if (m_uploadQueue.isEmpty()) {
+        emit logLine("上传队列已完成");
+        return;
+    }
 
+    UploadTask t = m_uploadQueue.dequeue();
+
+    m_uploadFile.setFileName(t.path);
+    if (!m_uploadFile.open(QIODevice::ReadOnly))
+    {
+        //打不开：跳过，继续下一个
+        emit logLine(QString("跳过：无法打开文件：%1").arg(t.path));
+        m_isUploading = false;
+        startNextUpload();
+        return;
+    }
+
+    //先发头（必须带 '\n'，让服务端进入上传状态）
+    const QString head = QString("UPLOAD##%1##%2\n").arg(t.name).arg(t.size);
     tcpSocket->write(head.toUtf8());
 
     // 再发二进制
-    while(!file.atEnd())
+    while(!m_uploadFile.atEnd())
     {
-        tcpSocket->write(file.read(4096));
+        tcpSocket->write(m_uploadFile.read(4096));
     }
+
+    //注意：
+    //这里不立刻 close 文件、不立刻刷新 LIST；
+    //必须等待服务端 UPLOAD_OK 再认为上传完成（避免网络缓冲导致“客户端认为发完了但服务端还没写完”）
+    m_isUploading = true;
 }
 
 //向服务端发送请求列表

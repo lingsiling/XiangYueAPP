@@ -1,7 +1,7 @@
 # XiangYueAPP / XiangYueServer（学习资源共享平台）
 
 一个基于 **Qt Widgets + TCP** 的简单“资源共享平台”示例项目，包含：
-- **客户端（XiangYueAPP）**：登录/注册、资源列表、搜索、上传、下载、资源详情（评论区、下载）
+- **客户端（XiangYueAPP）**：登录/注册、资源列表、搜索、上传（支持多文件）、下载、资源详情（评论区、下载）
 - **服务端（XiangYueServer）**：多线程接入、文件保存、SQLite（用户/评论等）
 
 > 协议为“**文本行协议 + 二进制数据流**”混合模式：控制指令以 `\n` 结尾，文件内容按 size 精确收发。
@@ -13,9 +13,9 @@
 ### Client
 - `logdialog.*`：登录/注册界面；登录成功后将同一个 `QTcpSocket*` 交给主界面使用（避免重复连接）
 - `usersession.*`：登录后的“用户会话信息”（`userId/username/avatar`），用于解耦 UI 模块
-- `mainwindow.*`：主界面（用户名、头像、资源列表、搜索、上传、打开资源详情）
-- `resourcedetaildialog.*`：资源详情对话框（下载、评论区显示与发送）
-- `fileclient.*`：客户端网络逻辑（LIST/UPLOAD/DOWNLOAD/FILE/评论等协议解析）
+- `mainwindow.*`：主界面（用户名、头像、资源列表、搜索、上传、打开资源详情、日志输出）
+- `resourcedetaildialog.*`：资源详情对话框（下载、评论区显示与发送、评论删除）
+- `fileclient.*`：客户端网络逻辑（LIST/UPLOAD/DOWNLOAD/FILE/评论等协议解析；**多文件上传队列**）
 - `resourcesearch.*`：资源搜索逻辑（与 UI 分离）
 
 ### Server
@@ -36,14 +36,14 @@
   - `LIST\n`
 - 下载资源文件：
   - `DOWNLOAD##fileName\n`
-- 上传资源文件：
+- 上传资源文件（单文件协议；多文件上传是“重复多次”发送该协议）：
   - 先发头：`UPLOAD##fileName##fileSize\n`
   - 再紧跟发送 `fileSize` 字节二进制内容
 - 注册：
   - `REGISTER##username##password\n`
 - 登录：
   - `LOGIN##username##password\n`
-- 获取头像（复用 FILE 传输）：
+- 获取头   （复用 FILE 传输）：
   - `GET_AVATAR##userId\n`
 
 #### 评论（content 支持换行）
@@ -53,12 +53,14 @@
   - `COMMENT_LIST##resourceName\n`
 - 发送评论：
   - `COMMENT_ADD##userId##resourceName##content_b64\n`
+- 删除评论（服务端强校验：只能删自己的）：
+  - `COMMENT_DEL##userId##commentId\n`
 
 > `content_b64 = base64(UTF-8(content))`
 
 ---
 
-### 服务    -> 客户端
+### 服务端 -> 客户端
 - 资源列表：
   - `LIST##f1##f2##f3...\n`
 - 下载响应（资源文件 / 头像文件都走该协议）：
@@ -80,6 +82,52 @@
 - `COMMENT_ADD_OK##commentId\n`
 - `COMMENT_ADD_FAIL##reason\n`
 
+删除评论结果：
+- `COMMENT_DEL_OK##commentId\n`
+- `COMMENT_DEL_FAIL##reason\n`
+
+---
+
+## 多文件上传流程说明（客户端）
+
+目标：**一次选择多个文件，按队列顺序逐个上传**；并且只有在服务端返回 `UPLOAD_OK` 后才上传下一个，保证状态一致。
+
+### 关键设计（低耦合）
+- UI（`MainWindow`）只负责：
+  - 通过 `QFileDialog::getOpenFileNames()` 选择多个文件路径
+  - 调用 `FileClient::uploadFiles(paths)`
+  - 监听 `FileClient::logLine`，把日志追加到 `textEdit`
+- `FileClient` 负责：
+  - 维护上传队列 `m_uploadQueue`
+  - 一次只发一个文件：发 `UPLOAD##...` + 二进制
+  - 收到 `UPLOAD_OK##fileName` 后，关闭当前文件句柄并 `startNextUpload()`
+
+### 流程
+1. 用户点击“上传文件”，多选文件。
+2. `MainWindow` 调用 `fileClient->uploadFiles(paths)`。
+3. `FileClient` 将每个路径转换为 `UploadTask` 入队，并启动 `startNextUpload()`：
+   - 发送头 `UPLOAD##name##size\n`
+   - 发送二进制内容
+4. 服务端收满 `fileSize` 字节后回 `UPLOAD_OK##fileName\n`。
+5. 客户端收到 `UPLOAD_OK`：
+   - emit `logLine("上传完成：xxx")`
+   - 关闭当前上传文件句柄
+   - 启动下一个任务  若队列为空则结束）
+   - 刷新列表 `LIST`
+
+---
+
+## 客户端日志输出（UI textEdit 追加）
+
+- `FileClient` 提供统一信号：
+  - `logLine(const QString &line)`
+- `MainWindow` 负责展示：
+  - `connect(fileClient, &FileClient::logLine, this, [=](const QString &s){ ui->textEdit->append(s); });`
+
+这样可以保证：
+- 网络层不依赖 UI 控件（低耦合）
+- UI 不关心协议细节，只关心“显示文本”
+
 ---
 
 ## 头像流程说明（客户端显示头像）
@@ -93,7 +141,7 @@
   5. `FileClient` 复用已有下载逻辑保存到 `ClientSave/` 并发出 `fileReceived(...)`
   6. `MainWindow` 接收 `fileReceived(...)` 并用 `QPixmap` 更新头像 `QLabel`
 
-> 为避免干扰用户，头像文件名以 `avatar_` 前缀回传时，客户端不会弹出“下载完成”提示。
+> 为避免干扰用户，头   文件名以 `avatar_` 前缀回传时，客户端不会弹出“下载完成”提示。
 
 ---
 
@@ -121,7 +169,7 @@
 ## 多线程模型（服务端）
 
 - 主线程仅负责 `listen()` + `incomingConnection()`
-- 每个连  创建一个 `QThread`
+- 每个连接创建一个 `QThread`
 - `ClientWorker` **moveToThread** 后，在子线程中创建 `QTcpSocket`，并调用 `setSocketDescriptor()`
 - 每个 worker 内维护独立的：
   - 接收缓冲区 `m_buf`
@@ -164,13 +212,11 @@
 ## 已知注意事项（重要）
 
 1. **上传完成确认必须在服务端“收满 fileSize 后”再发送**
-   - 否则客户端会收到多次 `UPLOAD_OK`，出现“弹窗多次/后续上传异常”等问题。
-
+   - 否则客户端会收到多次 `UPLOAD_OK`，出现“后续上传异常”等问题。
 2. **同一个 socket 的 readyRead 只能有一个模块消费**
    - 登录界面登录成功后必须断开自己的 `readyRead`，避免和主界面抢包。
-
-3. **评论内容使用 Base64**
-   - 这是为了支持换行与任意字符，并保持“按行协议”解析稳定。
+3. **评论内容   用 Base64**
+   - 为了支持换行与任意字符，并保持“按行协议”解析稳定。
 
 ---
 

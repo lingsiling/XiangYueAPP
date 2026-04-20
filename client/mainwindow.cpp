@@ -49,14 +49,14 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         refreshList(m_search.filter(key));
     });
 
-    //上传按钮
+    //上传按钮（可多选）
     connect(ui->buttonUpload, &QPushButton::clicked, this, [=]() {
 
-        QString filePath = QFileDialog::getOpenFileName(this,"选择文件");
+        const QStringList paths = QFileDialog::getOpenFileNames(this, "选择文件（可多选）");
+        if (paths.isEmpty()) return;
 
-        if(filePath.isEmpty()) return;
-
-        fileClient->uploadFile(filePath);
+        //UI 只调用接口，不关心“队列/协议/确认机制”
+        fileClient->uploadFiles(paths);
     });
 
     // 双击资源列表项：跳转到资源详情页
@@ -67,6 +67,11 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         // 这里把资源名、fileClient 传给详情页，详情页里点“下载”再触发下载
         ResourceDetailDialog dlg(this, resourceName, fileClient, m_session.userId);
         dlg.exec();
+    });
+
+    //UI追加日志输出
+    connect(fileClient, &FileClient::logLine, this, [=](const QString &line){
+        ui->textEdit->append(line);
     });
 }
 

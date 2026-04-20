@@ -88,7 +88,8 @@ void ClientWorker::tryProcessLines()
         }
         else if (line.startsWith("UPLOAD##"))
         {
-            // UPLOAD##fileName##fileSize
+            //UPLOAD##fileName##fileSize
+            //多文件上传：客户端会连续发多次 UPLOAD 头；服务端每次收满后必须恢复 idle
             QStringList p = line.split("##");
             m_uploadFileName = p.value(1).trimmed();
             m_uploadFileSize = p.value(2).toLongLong();
@@ -169,6 +170,11 @@ void ClientWorker::consumeUploadData()
 
         //只刷新一次列表
         sendFileList();
+
+        //清理本次状态
+        m_uploadFileName.clear();
+        m_uploadFileSize = 0;
+        m_uploadRecvSize = 0;
     }
 }
 

@@ -2,7 +2,6 @@
 #include "ui_logdialog.h"
 #include "mainwindow.h"
 #include "fileclient.h"
-
 #include <QMessageBox>
 #include <QDebug>
 
@@ -140,9 +139,6 @@ void LogDialog::processLines()
             w->setSession(s);   // 注入用户会话信息
             w->show();
 
-            //这里后面可以扩展：把 userId/username/avatar 传给 MainWindow 显示
-            //例如增加 MainWindow::setUserInfo(userId, username, avatar);
-
             this->close();
         }
         else if (msg.startsWith("LOGIN_FAIL##")) {
@@ -150,7 +146,7 @@ void LogDialog::processLines()
             QMessageBox::warning(this, "登录失败", reason);
         }
         else {
-            //其他消息（LIST/FILE 等）不会在登录阶段出现；先忽略
+            //其他消息（LIST/FILE 等）不会在登录阶段出现；忽略
         }
     }
 }
