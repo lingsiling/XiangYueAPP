@@ -1,16 +1,49 @@
-// clientworker.cpp
 #include "clientworker.h"
 #include "authservice.h"
-#include "dbmanager.h"
 #include "commentservice.h"
-#include <QByteArray>
-#include <QDir>
+#include "taskqueue.h"
+#include "dbconnectionpool.h"
+#include <QTcpSocket>
 #include <QDebug>
 #include <QThread>
+#include <QDir>
 
 ClientWorker::ClientWorker(qintptr socketDescriptor, QObject *parent)
-    : QObject(parent), m_sd(socketDescriptor)
+    : QObject(parent),
+    m_sd(socketDescriptor),
+    m_socket(nullptr),
+    m_isUploadIdle(true),
+    m_uploadFileSize(0),
+    m_uploadRecvSize(0),
+    m_saveDir("D:/Qt/Projects/XiangYueAPP/ServerSave/"),
+    m_dbPath("D:/Qt/Projects/XiangYueAPP/database/xiangyue.db"),
+    m_avatarDir("D:/Qt/Projects/XiangYueAPP/ServerAvatars/")
 {
+    //创建任务队列实例
+    m_taskQueue = std::make_shared<TaskQueue>(this);
+
+    //连接任务队列信号
+    connect(m_taskQueue.get(), &TaskQueue::taskCompleted,
+            this, &ClientWorker::onTaskCompleted);
+    connect(m_taskQueue.get(), &TaskQueue::taskError,
+            this, &ClientWorker::onTaskError);
+}
+
+ClientWorker::~ClientWorker()
+{
+    if (m_socket) {
+        if (m_socket->isOpen())
+            m_socket->close();
+        delete m_socket;
+    }
+
+    if (m_uploadFile.isOpen())
+        m_uploadFile.close();
+
+    //释放线程本地数据库连接
+    DBConnectionPool::instance().releaseConnection();
+
+    qDebug() << "[Worker] 清理完成";
 }
 
 void ClientWorker::start()
@@ -18,29 +51,33 @@ void ClientWorker::start()
     //socket 必须在本线程创建
     m_socket = new QTcpSocket(this);
 
-    //用 descriptor 接管 OS 连接（此时 socket 引擎属于本线程）
+    // 用 descriptor 接管 OS 连接
     if (!m_socket->setSocketDescriptor(m_sd)) {
-        qDebug() << "[Worker] setSocketDescriptor failed:" << m_socket->errorString();
+        qDebug() << "[Worker] setSocketDescriptor失败:" << m_socket->errorString();
         emit finished();
         return;
     }
 
-    //线程内初始化数据库连接（SQLite 每线程一连接）
-    DBManager::instance().openForCurrentThread(m_dbPath);
+    //初始化线程本地数据库连接
+    DBConnectionPool::instance().connection();
 
+    //启动任务队列处理线程
+    m_taskQueue->start();
+
+    //连接网络信号
     connect(m_socket, &QTcpSocket::readyRead, this, &ClientWorker::onReadyRead);
     connect(m_socket, &QTcpSocket::disconnected, this, &ClientWorker::onDisconnected);
 
-    qDebug() << "[Worker] client connected:"
+    qDebug() << "[Worker] 客户端已连接:"
              << m_socket->peerAddress().toString()
-             << m_socket->peerPort();
+             << ":" << m_socket->peerPort();
 }
 
 void ClientWorker::onReadyRead()
 {
     m_buf += m_socket->readAll();
 
-    //上传中：优先当二进制消费，禁止拆行（避免二进制里碰巧出现 '\n'）
+    //上传中：优先当二进制消费
     if (!m_isUploadIdle) {
         consumeUploadData();
         if (!m_isUploadIdle) return;
@@ -49,7 +86,7 @@ void ClientWorker::onReadyRead()
     //空闲状态：按行解析命令
     tryProcessLines();
 
-    //可能刚解析到 UPLOAD 头，缓冲区里已经粘了文件内容
+    //可能刚解析到上传头，缓冲区里已经粘了文件内容
     if (!m_isUploadIdle) {
         consumeUploadData();
     }
@@ -57,12 +94,16 @@ void ClientWorker::onReadyRead()
 
 void ClientWorker::onDisconnected()
 {
-    qDebug() << "[Worker] client disconnected";
+    qDebug() << "[Worker] 客户端已断开连接";
 
     if (m_uploadFile.isOpen())
         m_uploadFile.close();
 
-    //通知外部退出线程（ThreadedTcpServer 里 connect 了 finished->quit）
+    //停止任务队列
+    if (m_taskQueue)
+        m_taskQueue->stop();
+
+    //通知外部退出线程
     emit finished();
 }
 
@@ -77,19 +118,15 @@ void ClientWorker::tryProcessLines()
 
         const QString line = QString::fromUtf8(raw).trimmed();
 
-        if (line == "LIST")
-        {
-            sendFileList();
+        if (line == "LIST") {
+            handleListCommand();
         }
-        else if (line.startsWith("DOWNLOAD##"))
-        {
+        else if (line.startsWith("DOWNLOAD##")) {
             const QString fn = line.section("##", 1, 1).trimmed();
-            sendFile(fn);
+            handleDownloadCommand(fn);
         }
-        else if (line.startsWith("UPLOAD##"))
-        {
-            //UPLOAD##fileName##fileSize
-            //多文件上传：客户端会连续发多次 UPLOAD 头；服务端每次收满后必须恢复 idle
+        else if (line.startsWith("UPLOAD##")) {
+            //解析UPLOAD头：UPLOAD##fileName##fileSize
             QStringList p = line.split("##");
             m_uploadFileName = p.value(1).trimmed();
             m_uploadFileSize = p.value(2).toLongLong();
@@ -99,49 +136,34 @@ void ClientWorker::tryProcessLines()
             const QString path = m_saveDir + m_uploadFileName;
 
             m_uploadFile.setFileName(path);
-            if (!m_uploadFile.open(QIODevice::WriteOnly))
-            {
-                qDebug() << "[Worker] open upload file failed:" << path;
+            if (!m_uploadFile.open(QIODevice::WriteOnly)) {
+                qDebug() << "[Worker] 无法打开上传文件:" << path;
                 m_isUploadIdle = true;
-            }
-            else
-            {
-                qDebug() << "[Worker] upload start:" << m_uploadFileName
-                         << "size=" << m_uploadFileSize
-                         << "path=" << path;
-
-                // 进入上传二进制状态
+            } else {
+                qDebug() << "[Worker] 上传开始:" << m_uploadFileName
+                         << "大小=" << m_uploadFileSize;
                 m_isUploadIdle = false;
                 return;
             }
         }
-        else if (line.startsWith("REGISTER##"))
-        {
-            handleRegister(line);
+        else if (line.startsWith("REGISTER##")) {
+            handleRegisterCommand(line);
         }
-        else if (line.startsWith("LOGIN##"))
-        {
-            handleLogin(line);
+        else if (line.startsWith("LOGIN##")) {
+            handleLoginCommand(line);
         }
-        else if (line.startsWith("GET_AVATAR##"))
-        {
+        else if (line.startsWith("GET_AVATAR##")) {
             const qint64 uid = line.section("##", 1, 1).toLongLong();
-            handleGetAvatar(uid);
+            handleGetAvatarCommand(line);
         }
-        else if (line.startsWith("COMMENT_LIST##"))
-        {
-            handleCommentList(line);
+        else if (line.startsWith("COMMENT_LIST##")) {
+            handleCommentListCommand(line);
         }
-        else if (line.startsWith("COMMENT_ADD##"))
-        {
-            handleCommentAdd(line);
+        else if (line.startsWith("COMMENT_ADD##")) {
+            handleCommentAddCommand(line);
         }
-        else if (line.startsWith("COMMENT_DEL##"))
-        {
-            handleCommentDel(line);
-        }
-        else {
-            //预留：收藏/我的上传
+        else if (line.startsWith("COMMENT_DEL##")) {
+            handleCommentDelCommand(line);
         }
     }
 }
@@ -158,20 +180,19 @@ void ClientWorker::consumeUploadData()
     m_uploadRecvSize += len;
     m_buf.remove(0, canWrite);
 
-    //收满了“上传完成”
-    if (m_uploadRecvSize >= m_uploadFileSize)
-    {
+    //文件接收完成
+    if (m_uploadRecvSize >= m_uploadFileSize) {
         m_uploadFile.close();
-        m_isUploadIdle = true;                 //恢复空闲，才能接收下一次 UPLOAD##
+        m_isUploadIdle = true;
 
-        //只发一次确认
+        //发送确认
         const QString ok = QString("UPLOAD_OK##%1\n").arg(m_uploadFileName);
         m_socket->write(ok.toUtf8());
 
-        //只刷新一次列表
+        //刷新文件列表
         sendFileList();
 
-        //清理本次状态
+        //清理状态
         m_uploadFileName.clear();
         m_uploadFileSize = 0;
         m_uploadRecvSize = 0;
@@ -180,6 +201,7 @@ void ClientWorker::consumeUploadData()
 
 void ClientWorker::sendFileList()
 {
+    //快速操作，不需要异步处理
     QDir dir(m_saveDir);
     if (!dir.exists()) return;
 
@@ -190,11 +212,12 @@ void ClientWorker::sendFileList()
 
 void ClientWorker::sendFile(const QString &fileName)
 {
+    //快速操作，不需要异步处理
     const QString path = m_saveDir + fileName;
     QFile f(path);
 
     if (!f.open(QIODevice::ReadOnly)) {
-        qDebug() << "[Worker] open read failed:" << path;
+        qDebug() << "[Worker] 无法打开下载文件:" << path;
         return;
     }
 
@@ -205,151 +228,246 @@ void ClientWorker::sendFile(const QString &fileName)
     while (!f.atEnd()) {
         m_socket->write(f.read(4096));
     }
+
+    f.close();
 }
 
-void ClientWorker::handleRegister(const QString &line)
+void ClientWorker::handleListCommand()
 {
+    qDebug() << "[Worker] 处理LIST命令";
+    sendFileList();
+}
+
+void ClientWorker::handleDownloadCommand(const QString &fileName)
+{
+    qDebug() << "[Worker] 处理DOWNLOAD命令:" << fileName;
+    sendFile(fileName);
+}
+
+void ClientWorker::handleRegisterCommand(const QString &line)
+{
+    // 异步处理：注册涉及数据库写操作
     const QString username = line.section("##", 1, 1);
     const QString password = line.section("##", 2, 2);
 
-    AuthService service;
-    auto res = service.registerUser(username, password);
+    qDebug() << "[Worker] 提交注册任务:" << username;
 
-    if (res.ok) m_socket->write("REGISTER_OK\n");
-    else m_socket->write(QString("REGISTER_FAIL##%1\n").arg(res.reason).toUtf8());
+    m_taskQueue->enqueue([this, username, password]() {
+        // 在线程池执行：数据库操作
+        AuthService service;
+        auto res = service.registerUser(username, password);
+
+        // 使用 QMetaObject::invokeMethod 跨线程调用，确保安全
+        QMetaObject::invokeMethod(this, [this, res]() {
+            if (res.ok) {
+                sendResponse("REGISTER_OK\n");
+            } else {
+                sendResponse(QString("REGISTER_FAIL##%1\n").arg(res.reason));
+            }
+        }, Qt::QueuedConnection);
+    }, TaskQueue::HIGH, QString("REGISTER_%1").arg(username));
 }
 
-void ClientWorker::handleLogin(const QString &line)
+void ClientWorker::handleLoginCommand(const QString &line)
 {
+    //异步处理：登录涉及认证
     const QString username = line.section("##", 1, 1);
     const QString password = line.section("##", 2, 2);
 
-    AuthService service;
-    auto res = service.login(username, password);
+    qDebug() << "[Worker] 提交登录任务:" << username;
 
-    if (res.ok) {
-        const QString msg = QString("LOGIN_OK##%1##%2##%3\n")
-            .arg(res.userId)
-            .arg(res.username)
-            .arg(res.avatar);
-        m_socket->write(msg.toUtf8());
-    } else {
-        m_socket->write(QString("LOGIN_FAIL##%1\n").arg(res.reason).toUtf8());
-    }
+    m_taskQueue->enqueue([this, username, password]() {
+        AuthService service;
+        auto res = service.login(username, password);
+
+        //使用 QMetaObject::invokeMethod 跨线程调用
+        QMetaObject::invokeMethod(this, [this, res]() {
+            if (res.ok) {
+                const QString msg = QString("LOGIN_OK##%1##%2##%3\n")
+                .arg(res.userId)
+                    .arg(res.username)
+                    .arg(res.avatar);
+                sendResponse(msg);
+            } else {
+                sendResponse(QString("LOGIN_FAIL##%1\n").arg(res.reason));
+            }
+        }, Qt::QueuedConnection);
+    }, TaskQueue::HIGH, QString("LOGIN_%1").arg(username));
 }
 
-void ClientWorker::handleGetAvatar(qint64 userId)
+void ClientWorker::handleGetAvatarCommand(const QString &line)
 {
-    //头像文件不放数据库，只在 users.avatar 存相对路径（如 avatars/user_12.png）
-    //服务端统一从 m_avatarDir 下读取，避免任意路径访问风险
+    // 异步处理：涉及数据库查询和文件读取
+    const qint64 uid = line.section("##", 1, 1).toLongLong();
 
-    UserRepository repo;
-    auto recOpt = repo.findById(userId);
-    if (!recOpt.has_value())
-    {
-        m_socket->write("AVATAR_FAIL##USER_NOT_FOUND\n");
-        return;
-    }
+    qDebug() << "[Worker] 提交获取头像任务，用户ID:" << uid;
 
-    QString avatarRel = recOpt->avatar; //例子"avatars/default.png"
-    if (avatarRel.isEmpty())
-        avatarRel = "avatars/default.png";
+    m_taskQueue->enqueue([this, uid]() {
+        UserRepository repo;
+        auto recOpt = repo.findById(uid);
+        if (!recOpt.has_value()) {
+            QMetaObject::invokeMethod(this, [this]() {
+                sendResponse("AVATAR_FAIL##USER_NOT_FOUND\n");
+            }, Qt::QueuedConnection);
+            return;
+        }
 
-    //只取文件名，防止 avatarRel 被注入 "../"
-    const QString avatarFileName = QFileInfo(avatarRel).fileName();
-    const QString path = QDir(m_avatarDir).filePath(avatarFileName);
+        QString avatarRel = recOpt->avatar;
+        if (avatarRel.isEmpty())
+            avatarRel = "avatars/default.png";
 
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
-    {
-        m_socket->write("AVATAR_FAIL##FILE_NOT_FOUND\n");
-        return;
-    }
+        const QString avatarFileName = QFileInfo(avatarRel).fileName();
+        const QString path = QDir(m_avatarDir).filePath(avatarFileName);
 
-    //复用已有的 FILE 协议，客户端 FileClient 不用新增解析逻辑
-    const qint64 size = f.size();
-    // 让客户端能识别这是头像文件，避免弹“下载完成”
-    const QString outName = QString("avatar_%1_%2").arg(userId).arg(avatarFileName);
-    // 例：avatar_12_default.png 或 avatar_12_user_12.png
-    const QString head = QString("FILE##%1##%2\n").arg(outName).arg(size);
-    m_socket->write(head.toUtf8());
-    while (!f.atEnd())
-        m_socket->write(f.read(4096));
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly)) {
+            QMetaObject::invokeMethod(this, [this]() {
+                sendResponse("AVATAR_FAIL##FILE_NOT_FOUND\n");
+            }, Qt::QueuedConnection);
+            return;
+        }
+
+        const qint64 size = f.size();
+        const QString outName = QString("avatar_%1_%2").arg(uid).arg(avatarFileName);
+        const QString head = QString("FILE##%1##%2\n").arg(outName).arg(size);
+
+        // 头像数据需要在socket线程发送
+        QByteArray data;
+        while (!f.atEnd()) {
+            data.append(f.read(4096));
+        }
+        f.close();
+
+        // 跨线程发送
+        QMetaObject::invokeMethod(this, [this, head, data]() {
+            if (m_socket && m_socket->isOpen()) {
+                m_socket->write(head.toUtf8());
+                m_socket->write(data);
+            }
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("AVATAR_%1").arg(uid));
 }
 
-//Base64 工具实现
+
+void ClientWorker::handleCommentListCommand(const QString &line)
+{
+    // 异步处理：数据库查询
+    const QString resourceName = line.section("##", 1, 1).trimmed();
+
+    qDebug() << "[Worker] 提交获取评论列表任务:" << resourceName;
+
+    m_taskQueue->enqueue([this, resourceName]() {
+        CommentService service;
+        auto res = service.listComments(resourceName);
+
+        // 准备所有回复消息
+        QStringList responses;
+        responses << QString("COMMENT_BEGIN##%1\n").arg(resourceName);
+
+        if (res.ok) {
+            for (const auto &c : res.items) {
+                const QString msg = QString("COMMENT_ITEM##%1##%2##%3##%4##%5\n")
+                .arg(c.id)
+                    .arg(c.userId)
+                    .arg(toB64(c.username))
+                    .arg(toB64(c.createdAt))
+                    .arg(toB64(c.content));
+                responses << msg;
+            }
+        }
+
+        responses << QString("COMMENT_END##%1\n").arg(resourceName);
+
+        // 一次性跨线程发送所有消息
+        QMetaObject::invokeMethod(this, [this, responses]() {
+            for (const QString &msg : responses) {
+                sendResponse(msg);
+            }
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("COMMENT_LIST_%1").arg(resourceName));
+}
+
+
+void ClientWorker::handleCommentAddCommand(const QString &line)
+{
+    // 异步处理：数据库写操作
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+    const QString resourceName = line.section("##", 2, 2).trimmed();
+    const QString contentB64 = line.section("##", 3);
+    const QString content = fromB64(contentB64);
+
+    qDebug() << "[Worker] 提交添加评论任务:" << resourceName;
+
+    m_taskQueue->enqueue([this, userId, resourceName, content]() {
+        CommentService service;
+        auto res = service.addComment(userId, resourceName, content);
+
+        QString response;
+        if (res.ok) {
+            response = QString("COMMENT_ADD_OK##%1\n").arg(res.commentId);
+        } else {
+            response = QString("COMMENT_ADD_FAIL##%1\n").arg(res.reason);
+        }
+
+        // 跨线程发送
+        QMetaObject::invokeMethod(this, [this, response]() {
+            sendResponse(response);
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("COMMENT_ADD_%1").arg(resourceName));
+}
+
+void ClientWorker::handleCommentDelCommand(const QString &line)
+{
+    // 异步处理：数据库删除操作
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+    const qint64 commentId = line.section("##", 2, 2).toLongLong();
+
+    qDebug() << "[Worker] 提交删除评论任务，评论ID:" << commentId;
+
+    m_taskQueue->enqueue([this, userId, commentId]() {
+        CommentService service;
+        auto res = service.deleteComment(userId, commentId);
+
+        QString response;
+        if (res.ok) {
+            response = QString("COMMENT_DEL_OK##%1\n").arg(commentId);
+        } else {
+            response = QString("COMMENT_DEL_FAIL##%1\n").arg(res.reason);
+        }
+
+        // 跨线程发送
+        QMetaObject::invokeMethod(this, [this, response]() {
+            sendResponse(response);
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("COMMENT_DEL_%1").arg(commentId));
+}
+
+void ClientWorker::onTaskCompleted(const QString &taskType)
+{
+    qDebug() << "[Worker] 任务完成:" << taskType;
+}
+
+void ClientWorker::onTaskError(const QString &taskType, const QString &error)
+{
+    qWarning() << "[Worker] 任务出错:" << taskType << "错误:" << error;
+    sendResponse("ERROR##SERVER_ERROR\n");
+}
+
 QString ClientWorker::toB64(const QString &s)
 {
     return QString::fromUtf8(s.toUtf8().toBase64());
 }
+
 QString ClientWorker::fromB64(const QString &b64)
 {
     return QString::fromUtf8(QByteArray::fromBase64(b64.toUtf8()));
 }
 
-void ClientWorker::handleCommentList(const QString &line)
+void ClientWorker::sendResponse(const QString &response)
 {
-    const QString resourceName = line.section("##", 1, 1).trimmed();
-
-    CommentService service;
-    auto res = service.listComments(resourceName);
-
-    if (!res.ok) {
-        //也可以选择发 COMMENT_FAIL；这里先用 begin/end 返回空列表更简单
-        m_socket->write(QString("COMMENT_BEGIN##%1\n").arg(resourceName).toUtf8());
-        m_socket->write(QString("COMMENT_END##%1\n").arg(resourceName).toUtf8());
-        return;
-    }
-
-    //分批多行返回：BEGIN -> ITEM... -> END
-    m_socket->write(QString("COMMENT_BEGIN##%1\n").arg(resourceName).toUtf8());
-
-    for (const auto &c : res.items)
-    {
-        // username/createdAt/content 全部 base64，避免中文/换行/分隔符影响行协议
-        const QString msg = QString("COMMENT_ITEM##%1##%2##%3##%4##%5\n")
-                                .arg(c.id)
-                                .arg(c.userId)
-                                .arg(toB64(c.username))
-                                .arg(toB64(c.createdAt))
-                                .arg(toB64(c.content));
-        m_socket->write(msg.toUtf8());
-    }
-
-    m_socket->write(QString("COMMENT_END##%1\n").arg(resourceName).toUtf8());
-}
-
-void ClientWorker::handleCommentAdd(const QString &line)
-{
-    // COMMENT_ADD##userId##resourceName##content_b64
-    const qint64 userId = line.section("##", 1, 1).toLongLong();
-    const QString resourceName = line.section("##", 2, 2).trimmed();
-    const QString contentB64 = line.section("##", 3); // 从第3段开始到末尾（content 可能包含 ## 的 b64 不会含 #，但这样更稳）
-
-    const QString content = fromB64(contentB64);
-
-    CommentService service;
-    auto res = service.addComment(userId, resourceName, content);
-
-    if (res.ok) {
-        m_socket->write(QString("COMMENT_ADD_OK##%1\n").arg(res.commentId).toUtf8());
-    } else {
-        m_socket->write(QString("COMMENT_ADD_FAIL##%1\n").arg(res.reason).toUtf8());
-    }
-}
-
-void ClientWorker::handleCommentDel(const QString &line)
-{
-    // COMMENT_DEL##userId##commentId
-    const qint64 userId = line.section("##", 1, 1).toLongLong();
-    const qint64 commentId = line.section("##", 2, 2).toLongLong();
-
-    CommentService service;
-    auto res = service.deleteComment(userId, commentId);
-
-    if (res.ok) {
-        m_socket->write(QString("COMMENT_DEL_OK##%1\n").arg(commentId).toUtf8());
-    } else {
-        m_socket->write(QString("COMMENT_DEL_FAIL##%1\n").arg(res.reason).toUtf8());
+    //这个函数现在保证在socket的事件循环线程中调用
+    if (m_socket && m_socket->isOpen()) {
+        m_socket->write(response.toUtf8());
+        qDebug() << "[Worker] 发送回复:" << response.trimmed();
     }
 }

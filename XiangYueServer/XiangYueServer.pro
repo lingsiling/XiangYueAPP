@@ -11,10 +11,13 @@ SOURCES += \
     clientworker.cpp \
     commentrepository.cpp \
     commentservice.cpp \
+    dbconnectionpool.cpp \
     dbmanager.cpp \
     main.cpp \
     serverwidget.cpp \
+    taskqueue.cpp \
     threadedtcpserver.cpp \
+    threadpool.cpp \
     userrepository.cpp
 
 HEADERS += \
@@ -23,9 +26,12 @@ HEADERS += \
     commentrecord.h \
     commentrepository.h \
     commentservice.h \
+    dbconnectionpool.h \
     dbmanager.h \
     serverwidget.h \
+    taskqueue.h \
     threadedtcpserver.h \
+    threadpool.h \
     userrepository.h
 
 FORMS += \

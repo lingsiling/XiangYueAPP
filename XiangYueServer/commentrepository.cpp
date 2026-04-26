@@ -1,4 +1,3 @@
-// commentrepository.cpp
 #include "commentrepository.h"
 #include "dbmanager.h"
 

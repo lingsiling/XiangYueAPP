@@ -17,14 +17,14 @@ DBManager& DBManager::instance()
 
 bool DBManager::open(const QString &dbFilePath)
 {
-    // 防止重复 open（重复 open 也没意义）
+    //防止重复 open（重复 open 没意义）
     if (m_db.isOpen())
         return true;
 
-    // SQLite：数据库名就是文件路径
+    //SQLite：数据库名就是文件路径
     m_db.setDatabaseName(dbFilePath);
 
-    // open() 失败通常是：路径目录不存在 / 文件被占用 / 权限不足
+    //open() 失败通常是：路径目录不存在 / 文件被占用 / 权限不足
     if (!m_db.open()) {
         m_lastError = m_db.lastError().text();
         qDebug() << "[DB] open failed:" << m_lastError;
@@ -43,13 +43,13 @@ QSqlDatabase DBManager::db() const
     if (QSqlDatabase::contains(connName))
         return QSqlDatabase::database(connName);
 
-    // fallback：主线程初始化连接
+    //fallback：主线程初始化连接
     return m_db;
 }
 
 QSqlDatabase DBManager::openForCurrentThread(const QString &dbFilePath)
 {
-    // 每线程一个连接名，避免跨线程共享同一个 QSqlDatabase
+    //每线程一个连接名，避免跨线程共享同一个 QSqlDatabase
     const QString connName = QString("sqlite_conn_%1")
                                  .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
 

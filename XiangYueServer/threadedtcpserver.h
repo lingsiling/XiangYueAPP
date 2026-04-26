@@ -1,4 +1,3 @@
-// threadedtcpserver.h
 #ifndef THREADEDTCPServer_H
 #define THREADEDTCPServer_H
 

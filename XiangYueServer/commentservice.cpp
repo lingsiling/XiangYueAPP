@@ -1,4 +1,3 @@
-// commentservice.cpp
 #include "commentservice.h"
 
 CommentService::AddResult CommentService::addComment(qint64 userId,
