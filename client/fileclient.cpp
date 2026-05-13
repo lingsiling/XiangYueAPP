@@ -66,6 +66,9 @@ void FileClient::tryProcessLines()
 
             emit logLine(QString("上传完成：%1").arg(fn));
 
+            //发出上传完成信号
+            emit uploadFinished();
+
             //收到服务端确认后再刷新
             requestList();
 
@@ -129,15 +132,24 @@ void FileClient::consumeDownloadData()
     recvSize += len;
     m_buf.remove(0, canWrite);
 
+    //计算百分比并发出进度信号
+    if (fileSize > 0) {
+        int percentage = (int)((recvSize * 100) / fileSize);
+        emit downloadProgress(fileName, recvSize, fileSize, percentage);
+    }
+
     if(recvSize >= fileSize)
     {
         file.close();
         isDownloadStart = true;
 
-        // 通知 UI：某个文件已接收完成（头像也走这里）
+        //通知 UI：某个文件已接收完成（头像也走这里）
         emit fileReceived(fileName, file.fileName());
 
-        // 头像文件不弹提示（避免干扰用户）
+        //发出下载完成信号
+        emit downloadFinished();
+
+        //头像文件不弹提示（避免干扰用户）
         if (!fileName.startsWith("avatar_"))
             QMessageBox::information(mainWindow, "完成", "下载完成");
     }
@@ -153,7 +165,7 @@ void FileClient::uploadFile(QString filePath)
 void FileClient::uploadFiles(const QStringList &filePaths)
 {
     int added = 0;
-    //低耦合：FileClient 只关心“路径能否打开/大小”，不关心 UI 选择逻辑
+    //低FileClient 只关心“路径能否打开/大小”，不关心 UI 选择逻辑
     for (const QString &p : filePaths)
     {
         const QString path = p.trimmed();
@@ -218,13 +230,25 @@ void FileClient::startNextUpload()
     const QString head = QString("UPLOAD##%1##%2\n").arg(t.name).arg(t.size);
     tcpSocket->write(head.toUtf8());
 
-    // 再发二进制
+    //按块发送文件，每块发送后更新进度
+    qint64 sentSize = 0;
+    const qint64 chunkSize = 4096;  // 每块 4KB
+
+    //再发二进制
     while(!m_uploadFile.atEnd())
     {
-        tcpSocket->write(m_uploadFile.read(4096));
-    }
+        QByteArray chunk = m_uploadFile.read(chunkSize);
+        if (chunk.isEmpty()) break;
 
-    //注意：
+        tcpSocket->write(chunk);
+        sentSize += chunk.size();
+
+        //发出上传进度信号
+        if (t.size > 0) {
+            int percentage = (int)((sentSize * 100) / t.size);
+            emit uploadProgress(t.name, sentSize, t.size, percentage);
+        }
+    }
     //这里不立刻 close 文件、不立刻刷新 LIST；
     //必须等待服务端 UPLOAD_OK 再认为上传完成（避免网络缓冲导致“客户端认为发完了但服务端还没写完”）
     m_isUploading = true;

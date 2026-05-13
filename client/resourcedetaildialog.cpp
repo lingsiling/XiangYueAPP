@@ -1,5 +1,6 @@
 #include "resourcedetaildialog.h"
 #include "ui_resourcedetaildialog.h"
+#include "transferdialog.h"
 #include <QMessageBox>
 #include <QListWidget>
 #include <QMenu>
@@ -129,7 +130,32 @@ void ResourceDetailDialog::on_buttonDownload_clicked()
         return;
     }
 
+    //创建进度对话框
+    TransferDialog *dlg = new TransferDialog(this);
+    dlg->setFileName(m_resourceName);
+    dlg->setTransferType(TransferDialog::Download);
+
+    //使用 Lambda 连接信号
+    connect(m_fileClient,
+            QOverload<const QString&, qint64, qint64, int>::of(&FileClient::downloadProgress),
+            dlg,
+            &TransferDialog::updateProgress);
+
+    connect(m_fileClient, &FileClient::downloadFinished,
+            dlg, &TransferDialog::completeTransfer);
+
+    connect(dlg, &TransferDialog::cancelRequested,
+            m_fileClient, &FileClient::cancelDownloadRequested);
+
+    dlg->show();
+
+    //立即开始下载
+    qDebug() << "[Download] 开始下载:" << m_resourceName;
     m_fileClient->downloadFile(m_resourceName);
+
+    //清理：对话框关闭时删除
+    connect(dlg, &TransferDialog::finished,
+            [dlg]() { dlg->deleteLater(); });
 }
 
 void ResourceDetailDialog::on_buttonComment_clicked()

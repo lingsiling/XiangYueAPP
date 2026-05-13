@@ -13,6 +13,7 @@ SOURCES += \
     mainwindow.cpp \
     resourcedetaildialog.cpp \
     resourcesearch.cpp \
+    transferdialog.cpp \
     usersession.cpp
 
 HEADERS += \
@@ -21,12 +22,14 @@ HEADERS += \
     mainwindow.h \
     resourcedetaildialog.h \
     resourcesearch.h \
+    transferdialog.h \
     usersession.h
 
 FORMS += \
     logdialog.ui \
     mainwindow.ui \
-    resourcedetaildialog.ui
+    resourcedetaildialog.ui \
+    transferdialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

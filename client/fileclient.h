@@ -113,7 +113,7 @@ signals:
     void resourcesUpdated(const QStringList &list); //服务端列表更新时发出
     void fileReceived(const QString &fileName, const QString &localPath); //任何 FILE 下载完成通知
 
-    // 评论列表拉取完成（一次性返回，UI 刷新更简单）
+    //评论列表拉取完成（一次性返回，UI 刷新更简单）
     void commentsUpdated(const QString &resourceName, const QVector<CommentDto> &comments);
 
     void commentAddOk(qint64 commentId);
@@ -124,6 +124,26 @@ signals:
 
     //统一日志出口：UI 只负责显示（低耦合）
     void logLine(const QString &line);
+
+    //下载进度信号
+    void downloadProgress(const QString &fileName, qint64 recvSize,
+                          qint64 totalSize, int percentage);
+
+    //上传进度信号
+    void uploadProgress(const QString &fileName, qint64 sentSize,
+                        qint64 totalSize, int percentage);
+
+    //下载完成信号
+    void downloadFinished();
+
+    //上传完成信号
+    void uploadFinished();
+
+    //取消下载信号（供 TransferDialog 调用）
+    void cancelDownloadRequested();
+
+    //取消上传信号（供 TransferDialog 调用）
+    void cancelUploadRequested();
 };
 
 #endif // FILECLIENT_H
