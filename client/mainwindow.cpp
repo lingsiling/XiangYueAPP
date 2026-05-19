@@ -43,6 +43,8 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
             applyCurrentFilter();
     });
 
+    // 收藏列表更新：只在“我的收藏”视图下触发可见刷新
+    // 避免用户停留在“全部资源”时被收藏数据打断当前浏览
     connect(fileClient, &FileClient::favoritesUpdated, this, [=](const QStringList &list){
         m_favoriteResources = list;
         if (m_viewMode == ResourceViewMode::Favorites)
@@ -53,6 +55,8 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         ui->textEdit->append(QString("收藏列表加载失败：%1").arg(reason));
     });
 
+    // 在“我的收藏”视图里执行收藏/取消收藏后，主动回拉一次列表
+    // 这样可确保服务端状态、客户端缓存和界面显示三者一致
     connect(fileClient, &FileClient::favoriteAddOk, this, [=](const QString &){
         if (m_viewMode == ResourceViewMode::Favorites)
             fileClient->requestFavorites(m_session.userId);
@@ -68,6 +72,9 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         applyCurrentFilter();
     });
 
+    // “我的收藏”按钮承担双态导航职责：
+    // - 全部资源 -> 我的收藏（并触发收藏列表请求）
+    // - 我的收藏 -> 全部资源（直接用本地全量缓存恢复）
     connect(ui->buttonFavorite, &QPushButton::clicked, this, [=](){
         if (m_viewMode == ResourceViewMode::AllResources) {
             setViewMode(ResourceViewMode::Favorites);
@@ -114,6 +121,8 @@ void MainWindow::refreshList(const QStringList &list)
 
 void MainWindow::applyCurrentFilter()
 {
+    // 统一过滤入口：不关心当前是全部资源还是我的收藏，
+    // 先取“当前视图数据源”再做关键字过滤
     refreshList(filterResources(currentResources(), ui->searchline->text()));
 }
 
@@ -140,6 +149,7 @@ void MainWindow::setViewMode(ResourceViewMode mode)
 {
     m_viewMode = mode;
     if (mode == ResourceViewMode::Favorites) {
+        // 切到收藏视图后，将按钮文案改成“返回全部资源”的语义
         ui->buttonFavorite->setText("全部资源");
         ui->textEdit->append("已切换到：我的收藏");
         return;

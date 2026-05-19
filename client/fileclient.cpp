@@ -112,6 +112,11 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit commentDelFail(reason);
         }
+        // 收藏列表拉取采用和评论一致的批次协议：
+        // FAVORITE_BEGIN##userId
+        // FAVORITE_ITEM##resourceName_b64
+        // FAVORITE_END##userId
+        // 这样 UI 可以一次性刷新，避免“半列表”闪烁
         else if (line.startsWith("FAVORITE_BEGIN##"))
         {
             handleFavoriteBegin(line);
@@ -124,11 +129,14 @@ void FileClient::tryProcessLines()
         {
             handleFavoriteEnd(line);
         }
+        // 收藏列表拉取失败，统一走 *_FAIL##reason 风格
         else if (line.startsWith("FAVORITE_LIST_FAIL##"))
         {
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit favoriteListFail(reason);
         }
+        // 收藏/取消收藏成功时，服务端返回的是资源名 base64
+        // 这里先解码成明文资源名，再交给 UI 层处理状态更新
         else if (line.startsWith("FAVORITE_ADD_OK##"))
         {
             const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1));
@@ -149,6 +157,9 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit favoriteDelFail(reason);
         }
+        // 单资源收藏状态查询：
+        // FAVORITE_STATUS_OK##resourceName_b64##0|1
+        // 0 表示未收藏，1 表示已收藏
         else if (line.startsWith("FAVORITE_STATUS_OK##"))
         {
             const QString s = QString::fromUtf8(line);
@@ -435,6 +446,8 @@ void FileClient::requestFavorites(qint64 userId)
 {
     if (userId <= 0) return;
 
+    // 请求“我的收藏”列表（当前用户）
+    // 返回将通过 FAVORITE_BEGIN/ITEM/END 组合到达
     const QString cmd = QString("FAVORITE_LIST##%1\n").arg(userId);
     tcpSocket->write(cmd.toUtf8());
 }
@@ -444,6 +457,8 @@ void FileClient::addFavorite(qint64 userId, const QString &resourceName)
     const QString rn = resourceName.trimmed();
     if (userId <= 0 || rn.isEmpty()) return;
 
+    // 添加收藏：参数顺序固定为 userId -> resourceName
+    // 与服务端 section("##",...) 解析顺序保持一致
     const QString cmd = QString("FAVORITE_ADD##%1##%2\n").arg(userId).arg(rn);
     tcpSocket->write(cmd.toUtf8());
 }
@@ -453,6 +468,7 @@ void FileClient::deleteFavorite(qint64 userId, const QString &resourceName)
     const QString rn = resourceName.trimmed();
     if (userId <= 0 || rn.isEmpty()) return;
 
+    // 取消收藏：命令结构与添加收藏保持平行，便于维护
     const QString cmd = QString("FAVORITE_DEL##%1##%2\n").arg(userId).arg(rn);
     tcpSocket->write(cmd.toUtf8());
 }
@@ -462,18 +478,22 @@ void FileClient::requestFavoriteStatus(qint64 userId, const QString &resourceNam
     const QString rn = resourceName.trimmed();
     if (userId <= 0 || rn.isEmpty()) return;
 
+    // 查询“某资源是否已被当前用户收藏”
+    // 详情页打开时会调用，用于初始化按钮文案（收藏/取消收藏）
     const QString cmd = QString("FAVORITE_STATUS##%1##%2\n").arg(userId).arg(rn);
     tcpSocket->write(cmd.toUtf8());
 }
 
 void FileClient::handleFavoriteBegin(const QByteArray &line)
 {
+    // 开始一个新的收藏列表批次，记录 userId 以便 END 时做匹配校验
     m_pendingFavoriteUserId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
     m_pendingFavorites.clear();
 }
 
 void FileClient::handleFavoriteItem(const QByteArray &line)
 {
+    // ITEM 里资源名走 base64，规避中文/特殊字符干扰行协议
     const QString resourceNameB64 = QString::fromUtf8(line).section("##", 1);
     m_pendingFavorites.push_back(fromB64(resourceNameB64));
 }
@@ -481,9 +501,11 @@ void FileClient::handleFavoriteItem(const QByteArray &line)
 void FileClient::handleFavoriteEnd(const QByteArray &line)
 {
     const qint64 userId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+    // 只在 BEGIN/END userId 匹配时才发信号，避免并发请求串批次
     if (userId == m_pendingFavoriteUserId)
         emit favoritesUpdated(m_pendingFavorites);
 
+    // 无论是否匹配，都清空临时批次缓存，避免污染下一轮结果
     m_pendingFavoriteUserId = 0;
     m_pendingFavorites.clear();
 }

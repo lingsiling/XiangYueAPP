@@ -108,6 +108,8 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         QMessageBox::warning(this, "发送失败", reason);
     });
 
+    // 详情页只维护“当前资源”的收藏按钮状态，不维护收藏列表数据源
+    // 因此收到状态信号后必须先校验 resourceName，避免多窗口串扰
     connect(m_fileClient, &FileClient::favoriteStatusUpdated, this, [=](const QString &resourceName, bool isFavorite){
         if (resourceName != m_resourceName) return;
 
@@ -115,6 +117,7 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         updateFavoriteButton();
     });
 
+    // 收藏成功后直接本地切换按钮状态，保证交互“即时反馈”
     connect(m_fileClient, &FileClient::favoriteAddOk, this, [=](const QString &resourceName){
         if (resourceName != m_resourceName) return;
 
@@ -126,6 +129,7 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         QMessageBox::warning(this, "收藏失败", reason);
     });
 
+    // 取消收藏成功后同理立即更新按钮文案
     connect(m_fileClient, &FileClient::favoriteDelOk, this, [=](const QString &resourceName){
         if (resourceName != m_resourceName) return;
 
@@ -141,7 +145,10 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         QMessageBox::warning(this, "收藏状态获取失败", reason);
     });
 
-    // 打开详情页时先拉取评论列表
+    // 打开详情页时并行发起两类请求：
+    // 1) 评论列表（原有能力）
+    // 2) 收藏状态（新增能力）
+    // 按钮先给一个默认文案，随后由状态回包覆盖
     m_fileClient->requestComments(m_resourceName);
     m_fileClient->requestFavoriteStatus(m_userId, m_resourceName);
     updateFavoriteButton();
@@ -226,10 +233,12 @@ void ResourceDetailDialog::on_buttonFavorite_clicked()
     }
 
     if (m_isFavorite) {
+        // 当前已收藏 -> 执行取消收藏
         m_fileClient->deleteFavorite(m_userId, m_resourceName);
         return;
     }
 
+    // 当前未收藏 -> 执行添加收藏
     m_fileClient->addFavorite(m_userId, m_resourceName);
 }
 

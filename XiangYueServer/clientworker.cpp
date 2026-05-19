@@ -459,6 +459,8 @@ void ClientWorker::handleFavoriteListCommand(const QString &line)
 {
     const qint64 userId = line.section("##", 1, 1).toLongLong();
 
+    // 收藏相关命令全部走 TaskQueue 异步执行，保持与评论模块一致，
+    // 避免数据库操作阻塞 socket 线程的收发循环
     qDebug() << "[Worker] 提交获取收藏列表任务，用户ID:" << userId;
 
     m_taskQueue->enqueue([this, userId]() {
@@ -473,6 +475,7 @@ void ClientWorker::handleFavoriteListCommand(const QString &line)
             return;
         }
 
+        // 批次式返回，客户端可在 END 到达后一次性刷新列表
         QStringList responses;
         responses << QString("FAVORITE_BEGIN##%1\n").arg(userId);
         for (const QString &name : res.items) {
@@ -493,6 +496,8 @@ void ClientWorker::handleFavoriteAddCommand(const QString &line)
     const qint64 userId = line.section("##", 1, 1).toLongLong();
     const QString resourceName = line.section("##", 2).trimmed();
 
+    // 协议约定：FAVORITE_ADD##userId##resourceName
+    // 参数顺序固定，便于 section("##",...) 快速解析
     qDebug() << "[Worker] 提交添加收藏任务:" << resourceName;
 
     m_taskQueue->enqueue([this, userId, resourceName]() {
@@ -501,6 +506,7 @@ void ClientWorker::handleFavoriteAddCommand(const QString &line)
 
         QString response;
         if (res.ok) {
+            // 资源名统一 base64 回传，避免中文或分隔符破坏行协议
             response = QString("FAVORITE_ADD_OK##%1\n").arg(toB64(resourceName));
         } else {
             response = QString("FAVORITE_ADD_FAIL##%1\n").arg(res.reason);
@@ -517,6 +523,7 @@ void ClientWorker::handleFavoriteDelCommand(const QString &line)
     const qint64 userId = line.section("##", 1, 1).toLongLong();
     const QString resourceName = line.section("##", 2).trimmed();
 
+    // 删除命令和添加命令保持同构，降低维护复杂度
     qDebug() << "[Worker] 提交取消收藏任务:" << resourceName;
 
     m_taskQueue->enqueue([this, userId, resourceName]() {
@@ -541,6 +548,7 @@ void ClientWorker::handleFavoriteStatusCommand(const QString &line)
     const qint64 userId = line.section("##", 1, 1).toLongLong();
     const QString resourceName = line.section("##", 2).trimmed();
 
+    // 详情页打开时会调用该命令，用于决定按钮显示“收藏”还是“取消收藏”
     qDebug() << "[Worker] 提交查询收藏状态任务:" << resourceName;
 
     m_taskQueue->enqueue([this, userId, resourceName]() {
@@ -549,6 +557,7 @@ void ClientWorker::handleFavoriteStatusCommand(const QString &line)
 
         QString response;
         if (res.ok) {
+            // 0/1 语义简单稳定，便于客户端快速映射为 bool
             response = QString("FAVORITE_STATUS_OK##%1##%2\n")
                            .arg(toB64(resourceName))
                            .arg(res.isFavorite ? 1 : 0);
