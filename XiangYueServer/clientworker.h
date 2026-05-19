@@ -68,6 +68,10 @@ private:
     void handleCommentListCommand(const QString &line);
     void handleCommentAddCommand(const QString &line);
     void handleCommentDelCommand(const QString &line);
+    void handleFavoriteListCommand(const QString &line);
+    void handleFavoriteAddCommand(const QString &line);
+    void handleFavoriteDelCommand(const QString &line);
+    void handleFavoriteStatusCommand(const QString &line);
 
     //工具函数
     static QString toB64(const QString &s);

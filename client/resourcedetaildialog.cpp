@@ -108,8 +108,43 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         QMessageBox::warning(this, "发送失败", reason);
     });
 
+    connect(m_fileClient, &FileClient::favoriteStatusUpdated, this, [=](const QString &resourceName, bool isFavorite){
+        if (resourceName != m_resourceName) return;
+
+        m_isFavorite = isFavorite;
+        updateFavoriteButton();
+    });
+
+    connect(m_fileClient, &FileClient::favoriteAddOk, this, [=](const QString &resourceName){
+        if (resourceName != m_resourceName) return;
+
+        m_isFavorite = true;
+        updateFavoriteButton();
+    });
+
+    connect(m_fileClient, &FileClient::favoriteAddFail, this, [=](const QString &reason){
+        QMessageBox::warning(this, "收藏失败", reason);
+    });
+
+    connect(m_fileClient, &FileClient::favoriteDelOk, this, [=](const QString &resourceName){
+        if (resourceName != m_resourceName) return;
+
+        m_isFavorite = false;
+        updateFavoriteButton();
+    });
+
+    connect(m_fileClient, &FileClient::favoriteDelFail, this, [=](const QString &reason){
+        QMessageBox::warning(this, "取消收藏失败", reason);
+    });
+
+    connect(m_fileClient, &FileClient::favoriteStatusFail, this, [=](const QString &reason){
+        QMessageBox::warning(this, "收藏状态获取失败", reason);
+    });
+
     // 打开详情页时先拉取评论列表
     m_fileClient->requestComments(m_resourceName);
+    m_fileClient->requestFavoriteStatus(m_userId, m_resourceName);
+    updateFavoriteButton();
 }
 
 ResourceDetailDialog::~ResourceDetailDialog()
@@ -177,4 +212,28 @@ void ResourceDetailDialog::on_buttonComment_clicked()
 
     // content 支持换行；FileClient 会负责 base64 编码，协议层不耦合 UI
     m_fileClient->addComment(m_userId, m_resourceName, content);
+}
+
+void ResourceDetailDialog::on_buttonFavorite_clicked()
+{
+    if (!m_fileClient) {
+        QMessageBox::warning(this, "错误", "收藏模块未初始化");
+        return;
+    }
+    if (m_userId <= 0) {
+        QMessageBox::warning(this, "错误", "未登录，无法收藏");
+        return;
+    }
+
+    if (m_isFavorite) {
+        m_fileClient->deleteFavorite(m_userId, m_resourceName);
+        return;
+    }
+
+    m_fileClient->addFavorite(m_userId, m_resourceName);
+}
+
+void ResourceDetailDialog::updateFavoriteButton()
+{
+    ui->buttonFavorite->setText(m_isFavorite ? "取消收藏" : "收藏");
 }

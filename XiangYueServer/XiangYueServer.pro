@@ -13,6 +13,8 @@ SOURCES += \
     commentservice.cpp \
     dbconnectionpool.cpp \
     dbmanager.cpp \
+    favoriterepository.cpp \
+    favoriteservice.cpp \
     main.cpp \
     serverwidget.cpp \
     taskqueue.cpp \
@@ -28,6 +30,8 @@ HEADERS += \
     commentservice.h \
     dbconnectionpool.h \
     dbmanager.h \
+    favoriterepository.h \
+    favoriteservice.h \
     serverwidget.h \
     taskqueue.h \
     threadedtcpserver.h \

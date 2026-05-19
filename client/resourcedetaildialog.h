@@ -23,13 +23,17 @@ public:
 private slots:
     void on_buttonDownload_clicked();
     void on_buttonComment_clicked();
+    void on_buttonFavorite_clicked();
 
 private:
+    void updateFavoriteButton();
+
     Ui::ResourceDetailDialog *ui;
 
     QString m_resourceName;
     FileClient *m_fileClient = nullptr;
     qint64 m_userId = 0; // 当前登录用户 id（发送评论必须带上）
+    bool m_isFavorite = false;
 };
 
 #endif // RESOURCEDETAILDIALOG_H

@@ -112,9 +112,58 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit commentDelFail(reason);
         }
+        else if (line.startsWith("FAVORITE_BEGIN##"))
+        {
+            handleFavoriteBegin(line);
+        }
+        else if (line.startsWith("FAVORITE_ITEM##"))
+        {
+            handleFavoriteItem(line);
+        }
+        else if (line.startsWith("FAVORITE_END##"))
+        {
+            handleFavoriteEnd(line);
+        }
+        else if (line.startsWith("FAVORITE_LIST_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit favoriteListFail(reason);
+        }
+        else if (line.startsWith("FAVORITE_ADD_OK##"))
+        {
+            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1));
+            emit favoriteAddOk(resourceName);
+        }
+        else if (line.startsWith("FAVORITE_ADD_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit favoriteAddFail(reason);
+        }
+        else if (line.startsWith("FAVORITE_DEL_OK##"))
+        {
+            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1));
+            emit favoriteDelOk(resourceName);
+        }
+        else if (line.startsWith("FAVORITE_DEL_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit favoriteDelFail(reason);
+        }
+        else if (line.startsWith("FAVORITE_STATUS_OK##"))
+        {
+            const QString s = QString::fromUtf8(line);
+            const QString resourceName = fromB64(s.section("##", 1, 1));
+            const bool isFavorite = s.section("##", 2, 2).trimmed() == "1";
+            emit favoriteStatusUpdated(resourceName, isFavorite);
+        }
+        else if (line.startsWith("FAVORITE_STATUS_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit favoriteStatusFail(reason);
+        }
         else
         {
-            //预留：收藏等命令
+            //预留：更多命令
         }
     }
 }
@@ -380,4 +429,61 @@ void FileClient::deleteComment(qint64 userId, qint64 commentId)
     //行协议：删除评论（服务端会做“只能删除自己的”强校验）
     const QString cmd = QString("COMMENT_DEL##%1##%2\n").arg(userId).arg(commentId);
     tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::requestFavorites(qint64 userId)
+{
+    if (userId <= 0) return;
+
+    const QString cmd = QString("FAVORITE_LIST##%1\n").arg(userId);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::addFavorite(qint64 userId, const QString &resourceName)
+{
+    const QString rn = resourceName.trimmed();
+    if (userId <= 0 || rn.isEmpty()) return;
+
+    const QString cmd = QString("FAVORITE_ADD##%1##%2\n").arg(userId).arg(rn);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::deleteFavorite(qint64 userId, const QString &resourceName)
+{
+    const QString rn = resourceName.trimmed();
+    if (userId <= 0 || rn.isEmpty()) return;
+
+    const QString cmd = QString("FAVORITE_DEL##%1##%2\n").arg(userId).arg(rn);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::requestFavoriteStatus(qint64 userId, const QString &resourceName)
+{
+    const QString rn = resourceName.trimmed();
+    if (userId <= 0 || rn.isEmpty()) return;
+
+    const QString cmd = QString("FAVORITE_STATUS##%1##%2\n").arg(userId).arg(rn);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::handleFavoriteBegin(const QByteArray &line)
+{
+    m_pendingFavoriteUserId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+    m_pendingFavorites.clear();
+}
+
+void FileClient::handleFavoriteItem(const QByteArray &line)
+{
+    const QString resourceNameB64 = QString::fromUtf8(line).section("##", 1);
+    m_pendingFavorites.push_back(fromB64(resourceNameB64));
+}
+
+void FileClient::handleFavoriteEnd(const QByteArray &line)
+{
+    const qint64 userId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+    if (userId == m_pendingFavoriteUserId)
+        emit favoritesUpdated(m_pendingFavorites);
+
+    m_pendingFavoriteUserId = 0;
+    m_pendingFavorites.clear();
 }

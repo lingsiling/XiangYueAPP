@@ -5,6 +5,7 @@
  * 2. 请求文件列表
  * 3. 下载文件
  * 4. 评论/删除评论
+ * 5. 收藏/取消收藏/我的收藏
  *
  * 设计要点（低耦合）：
  * - UI 只调用 uploadFile()/uploadFiles()，不关心协议细节
@@ -57,6 +58,12 @@ public:
     // 删除评论：UI 只传 userId/commentId，不关心行协议细节
     void deleteComment(qint64 userId, qint64 commentId);
 
+    //收藏相关
+    void requestFavorites(qint64 userId);
+    void addFavorite(qint64 userId, const QString &resourceName);
+    void deleteFavorite(qint64 userId, const QString &resourceName);
+    void requestFavoriteStatus(qint64 userId, const QString &resourceName);
+
 private:
     //接收缓冲区：解决TCP粘包/拆包（命令行、FILE头）
     QByteArray m_buf;
@@ -74,6 +81,10 @@ private:
     //评论解析缓存（BEGIN -> ITEM... -> END）
     QString m_commentResource;
     QVector<CommentDto> m_pendingComments;
+
+    //收藏解析缓存（BEGIN -> ITEM... -> END）
+    qint64 m_pendingFavoriteUserId = 0;
+    QStringList m_pendingFavorites;
 
     //上传队列（多文件上传核心）
     struct UploadTask {
@@ -104,6 +115,11 @@ private:
     void handleCommentItem(const QByteArray &line);
     void handleCommentEnd(const QByteArray &line);
 
+    //收藏行解析
+    void handleFavoriteBegin(const QByteArray &line);
+    void handleFavoriteItem(const QByteArray &line);
+    void handleFavoriteEnd(const QByteArray &line);
+
     // Base64 工具：
     // content 允许换行，必须 base64 后再放入行协议
     static QString toB64(const QString &s);
@@ -121,6 +137,18 @@ signals:
 
     void commentDelOk(qint64 commentId);
     void commentDelFail(const QString &reason);
+
+    void favoritesUpdated(const QStringList &list);
+    void favoriteListFail(const QString &reason);
+
+    void favoriteAddOk(const QString &resourceName);
+    void favoriteAddFail(const QString &reason);
+
+    void favoriteDelOk(const QString &resourceName);
+    void favoriteDelFail(const QString &reason);
+
+    void favoriteStatusUpdated(const QString &resourceName, bool isFavorite);
+    void favoriteStatusFail(const QString &reason);
 
     //统一日志出口：UI 只负责显示（低耦合）
     void logLine(const QString &line);

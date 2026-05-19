@@ -1,6 +1,7 @@
 #include "clientworker.h"
 #include "authservice.h"
 #include "commentservice.h"
+#include "favoriteservice.h"
 #include "taskqueue.h"
 #include "dbconnectionpool.h"
 #include <QTcpSocket>
@@ -164,6 +165,18 @@ void ClientWorker::tryProcessLines()
         }
         else if (line.startsWith("COMMENT_DEL##")) {
             handleCommentDelCommand(line);
+        }
+        else if (line.startsWith("FAVORITE_LIST##")) {
+            handleFavoriteListCommand(line);
+        }
+        else if (line.startsWith("FAVORITE_ADD##")) {
+            handleFavoriteAddCommand(line);
+        }
+        else if (line.startsWith("FAVORITE_DEL##")) {
+            handleFavoriteDelCommand(line);
+        }
+        else if (line.startsWith("FAVORITE_STATUS##")) {
+            handleFavoriteStatusCommand(line);
         }
     }
 }
@@ -440,6 +453,113 @@ void ClientWorker::handleCommentDelCommand(const QString &line)
             sendResponse(response);
         }, Qt::QueuedConnection);
     }, TaskQueue::NORMAL, QString("COMMENT_DEL_%1").arg(commentId));
+}
+
+void ClientWorker::handleFavoriteListCommand(const QString &line)
+{
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+
+    qDebug() << "[Worker] 提交获取收藏列表任务，用户ID:" << userId;
+
+    m_taskQueue->enqueue([this, userId]() {
+        FavoriteService service;
+        auto res = service.listFavorites(userId);
+
+        if (!res.ok) {
+            const QString response = QString("FAVORITE_LIST_FAIL##%1\n").arg(res.reason);
+            QMetaObject::invokeMethod(this, [this, response]() {
+                sendResponse(response);
+            }, Qt::QueuedConnection);
+            return;
+        }
+
+        QStringList responses;
+        responses << QString("FAVORITE_BEGIN##%1\n").arg(userId);
+        for (const QString &name : res.items) {
+            responses << QString("FAVORITE_ITEM##%1\n").arg(toB64(name));
+        }
+        responses << QString("FAVORITE_END##%1\n").arg(userId);
+
+        QMetaObject::invokeMethod(this, [this, responses]() {
+            for (const QString &msg : responses) {
+                sendResponse(msg);
+            }
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("FAVORITE_LIST_%1").arg(userId));
+}
+
+void ClientWorker::handleFavoriteAddCommand(const QString &line)
+{
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+    const QString resourceName = line.section("##", 2).trimmed();
+
+    qDebug() << "[Worker] 提交添加收藏任务:" << resourceName;
+
+    m_taskQueue->enqueue([this, userId, resourceName]() {
+        FavoriteService service;
+        auto res = service.addFavorite(userId, resourceName);
+
+        QString response;
+        if (res.ok) {
+            response = QString("FAVORITE_ADD_OK##%1\n").arg(toB64(resourceName));
+        } else {
+            response = QString("FAVORITE_ADD_FAIL##%1\n").arg(res.reason);
+        }
+
+        QMetaObject::invokeMethod(this, [this, response]() {
+            sendResponse(response);
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("FAVORITE_ADD_%1").arg(resourceName));
+}
+
+void ClientWorker::handleFavoriteDelCommand(const QString &line)
+{
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+    const QString resourceName = line.section("##", 2).trimmed();
+
+    qDebug() << "[Worker] 提交取消收藏任务:" << resourceName;
+
+    m_taskQueue->enqueue([this, userId, resourceName]() {
+        FavoriteService service;
+        auto res = service.removeFavorite(userId, resourceName);
+
+        QString response;
+        if (res.ok) {
+            response = QString("FAVORITE_DEL_OK##%1\n").arg(toB64(resourceName));
+        } else {
+            response = QString("FAVORITE_DEL_FAIL##%1\n").arg(res.reason);
+        }
+
+        QMetaObject::invokeMethod(this, [this, response]() {
+            sendResponse(response);
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("FAVORITE_DEL_%1").arg(resourceName));
+}
+
+void ClientWorker::handleFavoriteStatusCommand(const QString &line)
+{
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+    const QString resourceName = line.section("##", 2).trimmed();
+
+    qDebug() << "[Worker] 提交查询收藏状态任务:" << resourceName;
+
+    m_taskQueue->enqueue([this, userId, resourceName]() {
+        FavoriteService service;
+        auto res = service.favoriteStatus(userId, resourceName);
+
+        QString response;
+        if (res.ok) {
+            response = QString("FAVORITE_STATUS_OK##%1##%2\n")
+                           .arg(toB64(resourceName))
+                           .arg(res.isFavorite ? 1 : 0);
+        } else {
+            response = QString("FAVORITE_STATUS_FAIL##%1\n").arg(res.reason);
+        }
+
+        QMetaObject::invokeMethod(this, [this, response]() {
+            sendResponse(response);
+        }, Qt::QueuedConnection);
+    }, TaskQueue::NORMAL, QString("FAVORITE_STATUS_%1").arg(resourceName));
 }
 
 void ClientWorker::onTaskCompleted(const QString &taskType)

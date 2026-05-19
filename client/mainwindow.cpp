@@ -39,15 +39,44 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         m_allResources = list;
         m_search.setAllResources(list);
 
-        //如果搜索框为空，显示全量；否则保持当前搜索结果
-        QString key = ui->searchline->text();
-        refreshList(m_search.filter(key));
+        if (m_viewMode == ResourceViewMode::AllResources)
+            applyCurrentFilter();
+    });
+
+    connect(fileClient, &FileClient::favoritesUpdated, this, [=](const QStringList &list){
+        m_favoriteResources = list;
+        if (m_viewMode == ResourceViewMode::Favorites)
+            applyCurrentFilter();
+    });
+
+    connect(fileClient, &FileClient::favoriteListFail, this, [=](const QString &reason){
+        ui->textEdit->append(QString("收藏列表加载失败：%1").arg(reason));
+    });
+
+    connect(fileClient, &FileClient::favoriteAddOk, this, [=](const QString &){
+        if (m_viewMode == ResourceViewMode::Favorites)
+            fileClient->requestFavorites(m_session.userId);
+    });
+
+    connect(fileClient, &FileClient::favoriteDelOk, this, [=](const QString &){
+        if (m_viewMode == ResourceViewMode::Favorites)
+            fileClient->requestFavorites(m_session.userId);
     });
 
     //搜索按钮
     connect(ui->buttonSearch, &QPushButton::clicked, this, [=](){
-        QString key = ui->searchline->text();
-        refreshList(m_search.filter(key));
+        applyCurrentFilter();
+    });
+
+    connect(ui->buttonFavorite, &QPushButton::clicked, this, [=](){
+        if (m_viewMode == ResourceViewMode::AllResources) {
+            setViewMode(ResourceViewMode::Favorites);
+            fileClient->requestFavorites(m_session.userId);
+            return;
+        }
+
+        setViewMode(ResourceViewMode::AllResources);
+        applyCurrentFilter();
     });
 
     //上传按钮（可多选）
@@ -83,12 +112,50 @@ void MainWindow::refreshList(const QStringList &list)
     ui->listWidget->addItems(list);
 }
 
+void MainWindow::applyCurrentFilter()
+{
+    refreshList(filterResources(currentResources(), ui->searchline->text()));
+}
+
+QStringList MainWindow::currentResources() const
+{
+    return m_viewMode == ResourceViewMode::Favorites ? m_favoriteResources : m_allResources;
+}
+
+QStringList MainWindow::filterResources(const QStringList &source, const QString &keyword) const
+{
+    const QString key = keyword.trimmed();
+    if (key.isEmpty())
+        return source;
+
+    QStringList out;
+    for (const QString &name : source) {
+        if (name.contains(key, Qt::CaseInsensitive))
+            out << name;
+    }
+    return out;
+}
+
+void MainWindow::setViewMode(ResourceViewMode mode)
+{
+    m_viewMode = mode;
+    if (mode == ResourceViewMode::Favorites) {
+        ui->buttonFavorite->setText("全部资源");
+        ui->textEdit->append("已切换到：我的收藏");
+        return;
+    }
+
+    ui->buttonFavorite->setText("我的收藏");
+    ui->textEdit->append("已切换到：全部资源");
+}
+
 void MainWindow::setSession(const UserSession &s)
 {
     //只做“显示”，不在这里做登录逻辑
     m_session = s;
 
     ui->username->setText(s.username);
+    setViewMode(ResourceViewMode::AllResources);
 
     requestAvatarIfNeeded();
 }

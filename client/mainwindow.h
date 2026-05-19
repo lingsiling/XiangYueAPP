@@ -28,12 +28,23 @@ protected:
     Ui::MainWindow *ui;
 
 private:
+    enum class ResourceViewMode {
+        AllResources,
+        Favorites
+    };
+
     ResourceSearch m_search;        //搜索逻辑
     QStringList m_allResources;     //全量资源（服务端 LIST）
+    QStringList m_favoriteResources;
     UserSession m_session;
+    ResourceViewMode m_viewMode = ResourceViewMode::AllResources;
     void requestAvatarIfNeeded();
     void refreshList(const QStringList &list); //刷新UI
     void showUploadProgressDialog(); //显示上传进度条
+    void applyCurrentFilter();
+    QStringList currentResources() const;
+    QStringList filterResources(const QStringList &source, const QString &keyword) const;
+    void setViewMode(ResourceViewMode mode);
 private:
     QTcpSocket *tcpSocket;//通信套接字
     FileClient *fileClient;//文件客户端对象
