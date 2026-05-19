@@ -5,6 +5,7 @@
 #include "taskqueue.h"
 #include "dbconnectionpool.h"
 #include <QTcpSocket>
+#include <QHostAddress>
 #include <QDebug>
 #include <QThread>
 #include <QDir>
@@ -154,7 +155,6 @@ void ClientWorker::tryProcessLines()
             handleLoginCommand(line);
         }
         else if (line.startsWith("GET_AVATAR##")) {
-            const qint64 uid = line.section("##", 1, 1).toLongLong();
             handleGetAvatarCommand(line);
         }
         else if (line.startsWith("COMMENT_LIST##")) {
