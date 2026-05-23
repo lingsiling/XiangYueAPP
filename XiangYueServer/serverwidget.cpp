@@ -1,5 +1,6 @@
 #include "dbmanager.h"
 #include "dbconnectionpool.h"
+#include "resourceservice.h"
 #include "threadpool.h"
 #include "serverwidget.h"
 #include "threadedtcpserver.h"
@@ -49,6 +50,22 @@ ServerWidget::ServerWidget(QWidget *parent)
         return;
     }
     ui->textEdit->append("数据库就绪（SQLite）\n");
+
+    // 先把服务器保存目录中的现有文件同步到 resources 表，避免历史文件没有入库
+    ui->textEdit->append("[3.5/4] 同步服务器资源目录...");
+    const QString saveDir = "D:/Qt/Projects/XiangYueAPP/ServerSave/";
+    QDir().mkpath(saveDir);
+
+    ResourceService resourceService;
+    // 启动时做一次目录对账，避免服务器已有文件但数据库里没有记录
+    auto syncRes = resourceService.syncDirectory(saveDir);
+    if (syncRes.ok) {
+        ui->textEdit->append(QString("资源同步完成：写入/更新 %1 条，清理 %2 条\n")
+                                 .arg(syncRes.touchedCount)
+                                 .arg(syncRes.removedCount));
+    } else {
+        ui->textEdit->append("资源同步失败: " + syncRes.reason);
+    }
 
     //4. 创建并启动TCP服务器
     ui->textEdit->append("[4/4] 启动TCP服务器...");

@@ -9,6 +9,7 @@
 #include <memory>
 
 class TaskQueue;
+class ResourceService;
 
 /*
  * ClientWorker：客户端连接处理器（运行在线程池的工作线程）
@@ -68,6 +69,7 @@ private:
     void handleCommentListCommand(const QString &line);
     void handleCommentAddCommand(const QString &line);
     void handleCommentDelCommand(const QString &line);
+    void handleDeleteResourceCommand(const QString &line);
 
     //工具函数
     static QString toB64(const QString &s);
@@ -95,6 +97,7 @@ private:
     QString m_saveDir;
     QString m_dbPath;
     QString m_avatarDir;
+    QString m_resourceDir;
 };
 
 #endif // CLIENTWORKER_H

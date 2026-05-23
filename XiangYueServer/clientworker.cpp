@@ -1,6 +1,7 @@
 #include "clientworker.h"
 #include "authservice.h"
 #include "commentservice.h"
+#include "resourceservice.h"
 #include "taskqueue.h"
 #include "dbconnectionpool.h"
 #include <QTcpSocket>
@@ -17,7 +18,8 @@ ClientWorker::ClientWorker(qintptr socketDescriptor, QObject *parent)
     m_uploadRecvSize(0),
     m_saveDir("D:/Qt/Projects/XiangYueAPP/ServerSave/"),
     m_dbPath("D:/Qt/Projects/XiangYueAPP/database/xiangyue.db"),
-    m_avatarDir("D:/Qt/Projects/XiangYueAPP/ServerAvatars/")
+    m_avatarDir("D:/Qt/Projects/XiangYueAPP/ServerAvatars/"),
+    m_resourceDir("D:/Qt/Projects/XiangYueAPP/ServerSave/")
 {
     //创建任务队列实例
     m_taskQueue = std::make_shared<TaskQueue>(this);
@@ -153,7 +155,6 @@ void ClientWorker::tryProcessLines()
             handleLoginCommand(line);
         }
         else if (line.startsWith("GET_AVATAR##")) {
-            const qint64 uid = line.section("##", 1, 1).toLongLong();
             handleGetAvatarCommand(line);
         }
         else if (line.startsWith("COMMENT_LIST##")) {
@@ -164,6 +165,9 @@ void ClientWorker::tryProcessLines()
         }
         else if (line.startsWith("COMMENT_DEL##")) {
             handleCommentDelCommand(line);
+        }
+        else if (line.startsWith("DELETE_RESOURCE##") || line.startsWith("DELETE_FILE##")) {
+            handleDeleteResourceCommand(line);
         }
     }
 }
@@ -184,6 +188,17 @@ void ClientWorker::consumeUploadData()
     if (m_uploadRecvSize >= m_uploadFileSize) {
         m_uploadFile.close();
         m_isUploadIdle = true;
+
+        //上传完成后，把文件同步到 resources 表，保证“服务器文件有库可查”
+        {
+            ResourceService service;
+            const QString path = m_saveDir + m_uploadFileName;
+            //这里只同步当前上传的单个文件，不影响其他上传/下载逻辑
+            auto syncRes = service.syncSingleFile(path);
+            if (!syncRes.ok) {
+                qWarning() << "[Worker] 资源入库失败:" << syncRes.reason << m_uploadFileName;
+            }
+        }
 
         //发送确认
         const QString ok = QString("UPLOAD_OK##%1\n").arg(m_uploadFileName);
@@ -440,6 +455,24 @@ void ClientWorker::handleCommentDelCommand(const QString &line)
             sendResponse(response);
         }, Qt::QueuedConnection);
     }, TaskQueue::NORMAL, QString("COMMENT_DEL_%1").arg(commentId));
+}
+
+void ClientWorker::handleDeleteResourceCommand(const QString &line)
+{
+    //资源删除命令：文件系统删文件，资源表删记录，保持两边一致
+    const QString fileName = line.section("##", 1, 1).trimmed();
+
+    qDebug() << "[Worker] 处理资源删除命令:" << fileName;
+
+    ResourceService service;
+    //由业务层统一处理删文件和删记录，Worker 只负责协议分发
+    auto res = service.deleteFileAndRecord(m_resourceDir, fileName);
+
+    if (res.ok) {
+        sendResponse(QString("DELETE_RESOURCE_OK##%1\n").arg(fileName));
+    } else {
+        sendResponse(QString("DELETE_RESOURCE_FAIL##%1\n").arg(res.reason));
+    }
 }
 
 void ClientWorker::onTaskCompleted(const QString &taskType)

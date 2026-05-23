@@ -14,6 +14,8 @@ SOURCES += \
     dbconnectionpool.cpp \
     dbmanager.cpp \
     main.cpp \
+    resourcerepository.cpp \
+    resourceservice.cpp \
     serverwidget.cpp \
     taskqueue.cpp \
     threadedtcpserver.cpp \
@@ -28,6 +30,8 @@ HEADERS += \
     commentservice.h \
     dbconnectionpool.h \
     dbmanager.h \
+    resourcerepository.h \
+    resourceservice.h \
     serverwidget.h \
     taskqueue.h \
     threadedtcpserver.h \
