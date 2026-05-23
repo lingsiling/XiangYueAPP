@@ -8,6 +8,7 @@
 #include <QFile>
 class FileClient;
 class TransferDialog;
+class MyUploadDialog;
 
 namespace Ui {
 class MainWindow;
@@ -34,10 +35,12 @@ private:
     void requestAvatarIfNeeded();
     void refreshList(const QStringList &list); //刷新UI
     void showUploadProgressDialog(); //显示上传进度条
+    void showMyUploadDialog(); //显示“我的上传”UI
 private:
     QTcpSocket *tcpSocket;//通信套接字
     FileClient *fileClient;//文件客户端对象
     TransferDialog *m_uploadDialog = nullptr; //上传进度条对话框
+    MyUploadDialog *m_myUploadDialog = nullptr; //我的上传对话框
 };
 
 #endif // MAINWINDOW_H

@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>FavoritesDialog</class>
- <widget class="QDialog" name="FavoritesDialog">
+ <class>MyUploadDialog</class>
+ <widget class="QDialog" name="MyUploadDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>520</width>
-    <height>640</height>
+    <width>560</width>
+    <height>680</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>我的收藏</string>
+   <string>我的上传</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayoutMain">
    <property name="spacing">
@@ -38,7 +38,7 @@
       </font>
      </property>
      <property name="text">
-      <string>我的收藏资源</string>
+      <string>我的上传资源</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
@@ -46,7 +46,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QListWidget" name="listWidgetFavorites">
+    <widget class="QListWidget" name="listWidgetUploads">
      <property name="alternatingRowColors">
       <bool>true</bool>
      </property>
@@ -77,7 +77,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="btnRefreshFavorites">
+      <widget class="QPushButton" name="btnRefreshUploads">
        <property name="minimumSize">
         <size>
          <width>110</width>
@@ -86,6 +86,19 @@
        </property>
        <property name="text">
         <string>刷新列表</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnDeleteUpload">
+       <property name="minimumSize">
+        <size>
+         <width>110</width>
+         <height>36</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>删除</string>
        </property>
       </widget>
      </item>

@@ -12,6 +12,7 @@ SOURCES += \
     favoritesdialog.cpp \
     logdialog.cpp \
     mainwindow.cpp \
+    myuploaddialog.cpp \
     resourcedetaildialog.cpp \
     resourcesearch.cpp \
     transferdialog.cpp \
@@ -22,6 +23,7 @@ HEADERS += \
     favoritesdialog.h \
     logdialog.h \
     mainwindow.h \
+    myuploaddialog.h \
     resourcedetaildialog.h \
     resourcesearch.h \
     transferdialog.h \
@@ -32,7 +34,8 @@ FORMS += \
     mainwindow.ui \
     resourcedetaildialog.ui \
     transferdialog.ui \
-    favoritesdialog.ui
+    favoritesdialog.ui \
+    myuploaddialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

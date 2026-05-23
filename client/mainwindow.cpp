@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "favoritesdialog.h"
+#include "myuploaddialog.h"
 #include "resourcedetaildialog.h"
 #include "fileclient.h"
 #include "transferdialog.h"
@@ -61,6 +62,11 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         });
 
         dlg.exec();
+    });
+
+    //“我的上传”按钮：只弹出上传 UI，不执行任何上传业务
+    connect(ui->buttonMyUpload, &QPushButton::clicked, this, [this]() {
+        showMyUploadDialog();
     });
 
     //上传按钮（可多选）
@@ -152,6 +158,26 @@ void MainWindow::showUploadProgressDialog()
 
     //显示进度条对话框（非模态，允许事件循环处理）
     m_uploadDialog->show();
+}
+
+void MainWindow::showMyUploadDialog()
+{
+    // 如果对话框已存在，就直接激活，避免重复创建多个窗口
+    if (m_myUploadDialog != nullptr) {
+        m_myUploadDialog->activateWindow();
+        m_myUploadDialog->raise();
+        return;
+    }
+
+    m_myUploadDialog = new MyUploadDialog(this);
+    m_myUploadDialog->setAttribute(Qt::WA_DeleteOnClose, true);
+
+    // 对话框销毁后清空指针，避免悬空引用
+    connect(m_myUploadDialog, &QObject::destroyed, this, [this]() {
+        m_myUploadDialog = nullptr;
+    });
+
+    m_myUploadDialog->show();
 }
 
 MainWindow::~MainWindow()
