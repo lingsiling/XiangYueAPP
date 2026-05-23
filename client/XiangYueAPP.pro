@@ -9,6 +9,7 @@ CONFIG += c++17
 SOURCES += \
     fileclient.cpp \
     main.cpp \
+    favoritesdialog.cpp \
     logdialog.cpp \
     mainwindow.cpp \
     resourcedetaildialog.cpp \
@@ -18,6 +19,7 @@ SOURCES += \
 
 HEADERS += \
     fileclient.h \
+    favoritesdialog.h \
     logdialog.h \
     mainwindow.h \
     resourcedetaildialog.h \
@@ -29,7 +31,8 @@ FORMS += \
     logdialog.ui \
     mainwindow.ui \
     resourcedetaildialog.ui \
-    transferdialog.ui
+    transferdialog.ui \
+    favoritesdialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "favoritesdialog.h"
 #include "resourcedetaildialog.h"
 #include "fileclient.h"
 #include "transferdialog.h"
@@ -48,6 +49,18 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     connect(ui->buttonSearch, &QPushButton::clicked, this, [=](){
         QString key = ui->searchline->text();
         refreshList(m_search.filter(key));
+    });
+
+    // 我的收藏按钮：只负责弹出收藏 UI，不直接耦合收藏数据源
+    connect(ui->buttonFavorite, &QPushButton::clicked, this, [this]() {
+        FavoritesDialog dlg(this);
+
+        // 刷新按钮点击后，先把信号抛出去，后续再按你的收藏模块接入数据刷新
+        connect(&dlg, &FavoritesDialog::refreshRequested, this, [this]() {
+            ui->textEdit->append("收藏列表刷新按钮已点击");
+        });
+
+        dlg.exec();
     });
 
     //上传按钮（可多选）
