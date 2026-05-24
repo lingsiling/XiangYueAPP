@@ -22,6 +22,9 @@ public:
 
     // 按文件名新增上传记录：后续如果改成按文件名关联，可在 service 层直接调用
     std::optional<qint64> insertByFileName(qint64 userId, const QString &filename);
+
+    // 按资源 ID 删除上传记录：用于资源删除时同步清理 uploads
+    bool deleteByResourceId(qint64 resourceId);
 };
 
 #endif // UPLOADREPOSITORY_H

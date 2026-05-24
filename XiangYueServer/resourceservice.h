@@ -40,6 +40,9 @@ public:
     //删除文件并同步删除资源记录：文件删除时调用
     DeleteResult deleteFileAndRecord(const QString &saveDir, const QString &fileName);
 
+    //删除文件、resources 记录以及 uploads 记录：用于“我的上传”删除
+    DeleteResult deleteFileAndUploadRecord(const QString &saveDir, const QString &fileName);
+
     //仅删除数据库记录：用于目录清理时兜底
     bool removeRecordOnly(const QString &fileName);
 

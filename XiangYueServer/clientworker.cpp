@@ -477,7 +477,7 @@ void ClientWorker::handleDeleteResourceCommand(const QString &line)
 
     ResourceService service;
     //由业务层统一处理删文件和删记录，Worker 只负责协议分发
-    auto res = service.deleteFileAndRecord(m_resourceDir, fileName);
+    auto res = service.deleteFileAndUploadRecord(m_resourceDir, fileName);
 
     if (res.ok) {
         sendResponse(QString("DELETE_RESOURCE_OK##%1\n").arg(fileName));
@@ -495,9 +495,6 @@ void ClientWorker::handleMyUploadsCommand(const QString &line)
 
     ResourceService service;
     const auto res = service.listByUploader(userId);
-
-    //记录查询结果以便调试（服务器端打印），客户端按批次接收并更新 UI
-    qDebug() << "[Worker] MY_UPLOADS result ok=" << res.ok << "items=" << res.items.size();
 
     //固定 begin/end 包裹，客户端可以稳态刷新 UI
     sendResponse(QString("MY_UPLOADS_BEGIN##%1\n").arg(userId));

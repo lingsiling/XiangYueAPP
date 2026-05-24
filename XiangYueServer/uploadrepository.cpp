@@ -66,3 +66,21 @@ std::optional<qint64> UploadRepository::insertByFileName(qint64 userId, const QS
 	const qint64 resourceId = q.value(0).toLongLong();
 	return insert(userId, resourceId);
 }
+
+bool UploadRepository::deleteByResourceId(qint64 resourceId)
+{
+	if (resourceId <= 0)
+		return false;
+
+	//资源删除时同步清理 uploads，避免“我的上传”里残留脏记录
+	QSqlQuery q(DBConnectionPool::instance().connection());
+	q.prepare("DELETE FROM uploads WHERE resource_id = ?");
+	q.addBindValue(resourceId);
+
+	if (!q.exec()) {
+		qDebug() << "[UploadRepo] deleteByResourceId failed:" << q.lastError().text();
+		return false;
+	}
+
+	return true;
+}

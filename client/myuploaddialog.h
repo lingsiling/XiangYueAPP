@@ -20,6 +20,7 @@ public:
 private:
     void refreshUploads();
     void renderUploads(const QVector<MyUploadDto> &items);
+    QString selectedUploadFileName() const;
 
 private:
     Ui::MyUploadDialog *ui;

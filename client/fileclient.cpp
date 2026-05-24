@@ -124,6 +124,16 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit commentDelFail(reason);
         }
+        else if (line.startsWith("DELETE_RESOURCE_OK##"))
+        {
+            const QString fileName = QString::fromUtf8(line).section("##", 1, 1).trimmed();
+            emit deleteMyUploadOk(fileName);
+        }
+        else if (line.startsWith("DELETE_RESOURCE_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit deleteMyUploadFail(reason);
+        }
         else
         {
             //预留：收藏等命令
@@ -393,6 +403,16 @@ void FileClient::deleteComment(qint64 userId, qint64 commentId)
 
     //行协议：删除评论（服务端会做“只能删除自己的”强校验）
     const QString cmd = QString("COMMENT_DEL##%1##%2\n").arg(userId).arg(commentId);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::deleteMyUpload(const QString &fileName)
+{
+    const QString name = fileName.trimmed();
+    if (name.isEmpty()) return;
+
+    //行协议：复用服务端现有资源删除入口，服务端会同步清理 resources/uploads
+    const QString cmd = QString("DELETE_RESOURCE##%1\n").arg(name);
     tcpSocket->write(cmd.toUtf8());
 }
 

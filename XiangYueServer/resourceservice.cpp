@@ -1,4 +1,5 @@
 #include "resourceservice.h"
+#include "uploadrepository.h"
 
 #include <QDir>
 #include <QFile>
@@ -84,6 +85,53 @@ ResourceService::DeleteResult ResourceService::deleteFileAndRecord(const QString
             r.reason = "FILE_DELETE_FAIL";
             return r;
         }
+    }
+
+    if (!m_repo.deleteByFileName(name)) {
+        r.ok = false;
+        r.reason = "SERVER_ERROR";
+        return r;
+    }
+
+    r.ok = true;
+    return r;
+}
+
+ResourceService::DeleteResult ResourceService::deleteFileAndUploadRecord(const QString &saveDir,
+                                                                         const QString &fileName)
+{
+    DeleteResult r;
+
+    //“我的上传”删除：文件、resources、uploads 三者必须一起清理
+    const QString name = fileName.trimmed();
+    if (name.isEmpty()) {
+        r.ok = false;
+        r.reason = "INVALID_FORMAT";
+        return r;
+    }
+
+    const auto recordOpt = m_repo.findByFileName(name);
+    if (!recordOpt.has_value()) {
+        r.ok = false;
+        r.reason = "RESOURCE_NOT_FOUND";
+        return r;
+    }
+
+    const QString fullPath = QDir(saveDir).filePath(name);
+
+    if (QFileInfo::exists(fullPath)) {
+        if (!QFile::remove(fullPath)) {
+            r.ok = false;
+            r.reason = "FILE_DELETE_FAIL";
+            return r;
+        }
+    }
+
+    UploadRepository uploadRepo;
+    if (!uploadRepo.deleteByResourceId(recordOpt->id)) {
+        r.ok = false;
+        r.reason = "UPLOAD_DELETE_FAIL";
+        return r;
     }
 
     if (!m_repo.deleteByFileName(name)) {
