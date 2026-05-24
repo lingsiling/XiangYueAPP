@@ -10,6 +10,7 @@
 
 class TaskQueue;
 class ResourceService;
+class UploadService;
 
 /*
  * ClientWorker：客户端连接处理器（运行在线程池的工作线程）
@@ -92,6 +93,8 @@ private:
     qint64 m_uploadFileSize;
     qint64 m_uploadRecvSize;
     QFile m_uploadFile;
+    qint64 m_uploadUserId;
+    qint64 m_currentUserId;
 
     //路径配置
     QString m_saveDir;

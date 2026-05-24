@@ -24,6 +24,7 @@ public:
 
     void sendData();//发送文件函数
     void setSession(const UserSession &s);   //登录成功后注入会话信息
+    qint64 currentUserId() const;
 
 protected:
     Ui::MainWindow *ui;

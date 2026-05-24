@@ -227,7 +227,9 @@ void FileClient::startNextUpload()
     }
 
     //先发头（必须带 '\n'，让服务端进入上传状态）
-    const QString head = QString("UPLOAD##%1##%2\n").arg(t.name).arg(t.size);
+    //协议升级：UPLOAD##fileName##fileSize##userId
+    const qint64 userId = (mainWindow ? mainWindow->currentUserId() : 0);
+    const QString head = QString("UPLOAD##%1##%2##%3\n").arg(t.name).arg(t.size).arg(userId);
     tcpSocket->write(head.toUtf8());
 
     //按块发送文件，每块发送后更新进度

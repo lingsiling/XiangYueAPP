@@ -4,6 +4,8 @@
 #include <QString>
 #include <optional>
 
+#include <QtGlobal>
+
 /*
  * UploadRepository：上传记录的数据访问层。
  *

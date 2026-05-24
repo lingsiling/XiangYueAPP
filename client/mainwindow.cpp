@@ -112,6 +112,11 @@ void MainWindow::setSession(const UserSession &s)
     requestAvatarIfNeeded();
 }
 
+qint64 MainWindow::currentUserId() const
+{
+    return m_session.userId;
+}
+
 void MainWindow::requestAvatarIfNeeded()
 {
     if (!tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState)

@@ -1,6 +1,7 @@
 #ifndef UPLOADSERVICE_H
 #define UPLOADSERVICE_H
 
+#include "resourcerepository.h"
 #include "uploadrepository.h"
 
 #include <QString>
@@ -27,6 +28,7 @@ public:
     RecordResult recordUploadedFile(const QString &filePath, qint64 userId);
 
 private:
+    ResourceRepository m_resourceRepo;
     UploadRepository m_repo;
 };
 

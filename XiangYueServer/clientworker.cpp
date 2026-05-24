@@ -4,6 +4,7 @@
 #include "resourceservice.h"
 #include "taskqueue.h"
 #include "dbconnectionpool.h"
+#include "uploadservice.h"
 #include <QTcpSocket>
 #include <QDebug>
 #include <QThread>
@@ -16,6 +17,8 @@ ClientWorker::ClientWorker(qintptr socketDescriptor, QObject *parent)
     m_isUploadIdle(true),
     m_uploadFileSize(0),
     m_uploadRecvSize(0),
+    m_uploadUserId(0),
+    m_currentUserId(0),
     m_saveDir("D:/Qt/Projects/XiangYueAPP/ServerSave/"),
     m_dbPath("D:/Qt/Projects/XiangYueAPP/database/xiangyue.db"),
     m_avatarDir("D:/Qt/Projects/XiangYueAPP/ServerAvatars/"),
@@ -128,10 +131,13 @@ void ClientWorker::tryProcessLines()
             handleDownloadCommand(fn);
         }
         else if (line.startsWith("UPLOAD##")) {
-            //解析UPLOAD头：UPLOAD##fileName##fileSize
+            //解析UPLOAD头：UPLOAD##fileName##fileSize##userId
             QStringList p = line.split("##");
             m_uploadFileName = p.value(1).trimmed();
             m_uploadFileSize = p.value(2).toLongLong();
+            //兼容旧客户端：第4段缺失时回退到连接登录态
+            const qint64 headerUserId = p.value(3).toLongLong();
+            m_uploadUserId = (headerUserId > 0 ? headerUserId : m_currentUserId);
             m_uploadRecvSize = 0;
 
             QDir().mkpath(m_saveDir);
@@ -143,7 +149,8 @@ void ClientWorker::tryProcessLines()
                 m_isUploadIdle = true;
             } else {
                 qDebug() << "[Worker] 上传开始:" << m_uploadFileName
-                         << "大小=" << m_uploadFileSize;
+                         << "大小=" << m_uploadFileSize
+                         << "userId=" << m_uploadUserId;
                 m_isUploadIdle = false;
                 return;
             }
@@ -189,14 +196,15 @@ void ClientWorker::consumeUploadData()
         m_uploadFile.close();
         m_isUploadIdle = true;
 
-        //上传完成后，把文件同步到 resources 表，保证“服务器文件有库可查”
+        //上传完成后，统一走 UploadService：同时写 resources 和 uploads
         {
-            ResourceService service;
+            UploadService service;
             const QString path = m_saveDir + m_uploadFileName;
-            //这里只同步当前上传的单个文件，不影响其他上传/下载逻辑
-            auto syncRes = service.syncSingleFile(path);
-            if (!syncRes.ok) {
-                qWarning() << "[Worker] 资源入库失败:" << syncRes.reason << m_uploadFileName;
+            auto recordRes = service.recordUploadedFile(path, m_uploadUserId);
+            if (!recordRes.ok) {
+                qWarning() << "[Worker] 上传入库失败:" << recordRes.reason
+                           << "file=" << m_uploadFileName
+                           << "userId=" << m_uploadUserId;
             }
         }
 
@@ -211,6 +219,7 @@ void ClientWorker::consumeUploadData()
         m_uploadFileName.clear();
         m_uploadFileSize = 0;
         m_uploadRecvSize = 0;
+        m_uploadUserId = 0;
     }
 }
 
@@ -298,6 +307,7 @@ void ClientWorker::handleLoginCommand(const QString &line)
         //使用 QMetaObject::invokeMethod 跨线程调用
         QMetaObject::invokeMethod(this, [this, res]() {
             if (res.ok) {
+                m_currentUserId = res.userId;
                 const QString msg = QString("LOGIN_OK##%1##%2##%3\n")
                 .arg(res.userId)
                     .arg(res.username)
@@ -360,40 +370,34 @@ void ClientWorker::handleGetAvatarCommand(const QString &line)
                 m_socket->write(data);
             }
         }, Qt::QueuedConnection);
-    }, TaskQueue::NORMAL, QString("AVATAR_%1").arg(uid));
+    }, TaskQueue::HIGH, QString("AVATAR_%1").arg(uid));
 }
-
 
 void ClientWorker::handleCommentListCommand(const QString &line)
 {
-    // 异步处理：数据库查询
     const QString resourceName = line.section("##", 1, 1).trimmed();
 
-    qDebug() << "[Worker] 提交获取评论列表任务:" << resourceName;
+    qDebug() << "[Worker] 提交获取评论任务:" << resourceName;
 
     m_taskQueue->enqueue([this, resourceName]() {
         CommentService service;
         auto res = service.listComments(resourceName);
 
-        // 准备所有回复消息
         QStringList responses;
-        responses << QString("COMMENT_BEGIN##%1\n").arg(resourceName);
-
         if (res.ok) {
             for (const auto &c : res.items) {
                 const QString msg = QString("COMMENT_ITEM##%1##%2##%3##%4##%5\n")
-                .arg(c.id)
-                    .arg(c.userId)
-                    .arg(toB64(c.username))
-                    .arg(toB64(c.createdAt))
-                    .arg(toB64(c.content));
+                        .arg(c.id)
+                        .arg(c.userId)
+                        .arg(toB64(c.username))
+                        .arg(toB64(c.createdAt))
+                        .arg(toB64(c.content));
                 responses << msg;
             }
         }
 
         responses << QString("COMMENT_END##%1\n").arg(resourceName);
 
-        // 一次性跨线程发送所有消息
         QMetaObject::invokeMethod(this, [this, responses]() {
             for (const QString &msg : responses) {
                 sendResponse(msg);
