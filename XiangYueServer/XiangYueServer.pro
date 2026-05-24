@@ -16,6 +16,8 @@ SOURCES += \
     main.cpp \
     resourcerepository.cpp \
     resourceservice.cpp \
+    uploadrepository.cpp \
+    uploadservice.cpp \
     serverwidget.cpp \
     taskqueue.cpp \
     threadedtcpserver.cpp \
@@ -36,6 +38,8 @@ HEADERS += \
     taskqueue.h \
     threadedtcpserver.h \
     threadpool.h \
+    uploadrepository.h \
+    uploadservice.h \
     userrepository.h
 
 FORMS += \
