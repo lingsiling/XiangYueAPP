@@ -43,7 +43,7 @@ ResourceService::SyncResult ResourceService::syncSingleFile(const QString &fileP
 {
     SyncResult r;
 
-    // 上传完成后只同步当前文件，避免每次都扫描整个目录
+    //上传完成后只同步当前文件，避免每次都扫描整个目录
     QFileInfo info(filePath);
     if (!info.exists() || !info.isFile()) {
         r.ok = false;
@@ -100,4 +100,20 @@ bool ResourceService::removeRecordOnly(const QString &fileName)
 {
     //仅在确实不需要磁盘文件时使用这个兜底接口
     return m_repo.deleteByFileName(fileName);
+}
+
+ResourceService::ListByUploaderResult ResourceService::listByUploader(qint64 uploaderUserId)
+{
+    ListByUploaderResult r;
+
+    if (uploaderUserId <= 0) {
+        r.ok = false;
+        r.reason = "INVALID_FORMAT";
+        return r;
+    }
+
+    //业务层只负责输入校验和结果组织，SQL 在 repository 中
+    r.items = m_repo.listByUploader(uploaderUserId);
+    r.ok = true;
+    return r;
 }

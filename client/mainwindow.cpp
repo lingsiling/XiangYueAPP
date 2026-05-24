@@ -174,7 +174,7 @@ void MainWindow::showMyUploadDialog()
         return;
     }
 
-    m_myUploadDialog = new MyUploadDialog(this);
+    m_myUploadDialog = new MyUploadDialog(fileClient, m_session.userId, this);
     m_myUploadDialog->setAttribute(Qt::WA_DeleteOnClose, true);
 
     // 对话框销毁后清空指针，避免悬空引用

@@ -92,6 +92,18 @@ void FileClient::tryProcessLines()
         {
             handleCommentEnd(line);
         }
+        else if (line.startsWith("MY_UPLOADS_BEGIN##"))
+        {
+            handleMyUploadsBegin(line);
+        }
+        else if (line.startsWith("MY_UPLOADS_ITEM##"))
+        {
+            handleMyUploadsItem(line);
+        }
+        else if (line.startsWith("MY_UPLOADS_END##"))
+        {
+            handleMyUploadsEnd(line);
+        }
         else if (line.startsWith("COMMENT_ADD_OK##"))
         {
             const qint64 id = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
@@ -382,4 +394,46 @@ void FileClient::deleteComment(qint64 userId, qint64 commentId)
     //行协议：删除评论（服务端会做“只能删除自己的”强校验）
     const QString cmd = QString("COMMENT_DEL##%1##%2\n").arg(userId).arg(commentId);
     tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::requestMyUploads(qint64 userId)
+{
+    if (userId <= 0) return;
+
+    //行协议：请求“我的上传”列表
+    const QString cmd = QString("MY_UPLOADS##%1\n").arg(userId);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::handleMyUploadsBegin(const QByteArray &line)
+{
+    // MY_UPLOADS_BEGIN##userId
+    m_myUploadsUserId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+    m_pendingMyUploads.clear();
+}
+
+void FileClient::handleMyUploadsItem(const QByteArray &line)
+{
+    // MY_UPLOADS_ITEM##filename_b64##size##uploadedAt_b64
+    const QString s = QString::fromUtf8(line);
+
+    MyUploadDto item;
+    item.fileName = fromB64(s.section("##", 1, 1));
+    item.size = s.section("##", 2, 2).toLongLong();
+    item.uploadedAt = fromB64(s.section("##", 3));
+    m_pendingMyUploads.push_back(item);
+}
+
+void FileClient::handleMyUploadsEnd(const QByteArray &line)
+{
+    // MY_UPLOADS_END##userId
+    const qint64 uid = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+
+    //只在同一批次结束时发信号，避免污染其他请求
+    if (uid == m_myUploadsUserId) {
+        emit myUploadsUpdated(uid, m_pendingMyUploads);
+    }
+
+    m_myUploadsUserId = 0;
+    m_pendingMyUploads.clear();
 }

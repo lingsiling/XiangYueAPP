@@ -8,7 +8,7 @@
 
 std::optional<ResourceRecord> ResourceRepository::findByFileName(const QString &filename)
 {
-    // 按文件名查找资源记录，供上传覆盖、删除同步、启动清理使用
+    //按文件名查找资源记录，供上传覆盖、删除同步、启动清理使用
     QSqlQuery q(DBConnectionPool::instance().connection());
     q.prepare(R"SQL(
         SELECT id, filename, server_path, size, uploader_user_id, uploaded_at
@@ -135,4 +135,42 @@ bool ResourceRepository::deleteByFileName(const QString &filename)
     }
 
     return true;
+}
+
+QList<ResourceRecord> ResourceRepository::listByUploader(qint64 uploaderUserId)
+{
+    //“我的上传”只需要查当前用户关联的资源记录
+    QList<ResourceRecord> out;
+    if (uploaderUserId <= 0)
+        return out;
+
+    // 优先依据 uploads 表（用户-资源关联）查询，避免仅依赖 resources.uploader_user_id
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare(R"SQL(
+        SELECT r.id, r.filename, r.server_path, r.size, r.uploader_user_id, r.uploaded_at, u.created_at
+        FROM resources r
+        JOIN uploads u ON u.resource_id = r.id
+        WHERE u.user_id = ?
+        ORDER BY u.created_at DESC, r.uploaded_at DESC, r.id DESC
+    )SQL");
+    q.addBindValue(uploaderUserId);
+
+    if (!q.exec()) {
+        qDebug() << "[ResourceRepo] listByUploader failed:" << q.lastError().text();
+        return out;
+    }
+
+    while (q.next()) {
+        ResourceRecord rec;
+        rec.id = q.value(0).toLongLong();
+        rec.filename = q.value(1).toString();
+        rec.serverPath = q.value(2).toString();
+        rec.size = q.value(3).toLongLong();
+        if (!q.value(4).isNull())
+            rec.uploaderUserId = q.value(4).toLongLong();
+        rec.uploadedAt = q.value(5).toString();
+        out.push_back(rec);
+    }
+
+    return out;
 }

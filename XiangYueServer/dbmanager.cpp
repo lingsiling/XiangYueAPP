@@ -151,6 +151,11 @@ bool DBManager::initSchema()
     )SQL", "create idx_uploads_user")) return false;
 
     if (!execOrLog(R"SQL(
+        CREATE INDEX IF NOT EXISTS idx_uploads_resource
+        ON uploads(resource_id);
+    )SQL", "create idx_uploads_resource")) return false;
+
+    if (!execOrLog(R"SQL(
         CREATE INDEX IF NOT EXISTS idx_favorites_user
         ON favorites(user_id);
     )SQL", "create idx_favorites_user")) return false;

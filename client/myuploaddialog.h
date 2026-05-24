@@ -2,6 +2,7 @@
 #define MYUPLOADDIALOG_H
 
 #include <QDialog>
+#include "fileclient.h"
 
 namespace Ui {
 class MyUploadDialog;
@@ -13,11 +14,17 @@ class MyUploadDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit MyUploadDialog(QWidget *parent = nullptr);
+    explicit MyUploadDialog(FileClient *fileClient, qint64 userId, QWidget *parent = nullptr);
     ~MyUploadDialog();
 
 private:
+    void refreshUploads();
+    void renderUploads(const QVector<MyUploadDto> &items);
+
+private:
     Ui::MyUploadDialog *ui;
+    FileClient *m_fileClient = nullptr;
+    qint64 m_userId = 0;
 };
 
 #endif // MYUPLOADDIALOG_H

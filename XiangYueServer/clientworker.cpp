@@ -176,6 +176,9 @@ void ClientWorker::tryProcessLines()
         else if (line.startsWith("DELETE_RESOURCE##") || line.startsWith("DELETE_FILE##")) {
             handleDeleteResourceCommand(line);
         }
+        else if (line.startsWith("MY_UPLOADS##")) {
+            handleMyUploadsCommand(line);
+        }
     }
 }
 
@@ -384,6 +387,10 @@ void ClientWorker::handleCommentListCommand(const QString &line)
         auto res = service.listComments(resourceName);
 
         QStringList responses;
+
+        //先发送一个批次开始标识，客户端按 COMMENT_BEGIN/ITEM/END 批量接收
+        responses << QString("COMMENT_BEGIN##%1\n").arg(resourceName);
+
         if (res.ok) {
             for (const auto &c : res.items) {
                 const QString msg = QString("COMMENT_ITEM##%1##%2##%3##%4##%5\n")
@@ -477,6 +484,35 @@ void ClientWorker::handleDeleteResourceCommand(const QString &line)
     } else {
         sendResponse(QString("DELETE_RESOURCE_FAIL##%1\n").arg(res.reason));
     }
+}
+
+void ClientWorker::handleMyUploadsCommand(const QString &line)
+{
+    //行协议：MY_UPLOADS##userId
+    const qint64 userId = line.section("##", 1, 1).toLongLong();
+
+    qDebug() << "[Worker] 处理我的上传查询，userId=" << userId;
+
+    ResourceService service;
+    const auto res = service.listByUploader(userId);
+
+    //记录查询结果以便调试（服务器端打印），客户端按批次接收并更新 UI
+    qDebug() << "[Worker] MY_UPLOADS result ok=" << res.ok << "items=" << res.items.size();
+
+    //固定 begin/end 包裹，客户端可以稳态刷新 UI
+    sendResponse(QString("MY_UPLOADS_BEGIN##%1\n").arg(userId));
+
+    if (res.ok) {
+        for (const auto &item : res.items) {
+            const QString msg = QString("MY_UPLOADS_ITEM##%1##%2##%3\n")
+                    .arg(toB64(item.filename))
+                    .arg(item.size)
+                    .arg(toB64(item.uploadedAt));
+            sendResponse(msg);
+        }
+    }
+
+    sendResponse(QString("MY_UPLOADS_END##%1\n").arg(userId));
 }
 
 void ClientWorker::onTaskCompleted(const QString &taskType)

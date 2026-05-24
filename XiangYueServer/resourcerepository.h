@@ -36,6 +36,9 @@ public:
 
     // 按文件名删除资源记录
     bool deleteByFileName(const QString &filename);
+
+    // 按上传者查询资源列表（用于“我的上传”）
+    QList<ResourceRecord> listByUploader(qint64 uploaderUserId);
 };
 
 #endif // RESOURCEREPOSITORY_H

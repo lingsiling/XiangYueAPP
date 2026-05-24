@@ -34,6 +34,14 @@ struct CommentDto
     QString content;
 };
 
+//MyUploadDto：客户端“我的上传”列表项
+struct MyUploadDto
+{
+    QString fileName;
+    qint64 size = 0;
+    QString uploadedAt;
+};
+
 class FileClient : public QObject
 {
     Q_OBJECT
@@ -57,6 +65,9 @@ public:
     // 删除评论：UI 只传 userId/commentId，不关心行协议细节
     void deleteComment(qint64 userId, qint64 commentId);
 
+    //我的上传：按用户ID请求上传记录
+    void requestMyUploads(qint64 userId);
+
 private:
     //接收缓冲区：解决TCP粘包/拆包（命令行、FILE头）
     QByteArray m_buf;
@@ -74,6 +85,10 @@ private:
     //评论解析缓存（BEGIN -> ITEM... -> END）
     QString m_commentResource;
     QVector<CommentDto> m_pendingComments;
+
+    //我的上传解析缓存（BEGIN -> ITEM... -> END）
+    qint64 m_myUploadsUserId = 0;
+    QVector<MyUploadDto> m_pendingMyUploads;
 
     //上传队列（多文件上传核心）
     struct UploadTask {
@@ -103,6 +118,9 @@ private:
     void handleCommentBegin(const QByteArray &line);
     void handleCommentItem(const QByteArray &line);
     void handleCommentEnd(const QByteArray &line);
+    void handleMyUploadsBegin(const QByteArray &line);
+    void handleMyUploadsItem(const QByteArray &line);
+    void handleMyUploadsEnd(const QByteArray &line);
 
     // Base64 工具：
     // content 允许换行，必须 base64 后再放入行协议
@@ -121,6 +139,9 @@ signals:
 
     void commentDelOk(qint64 commentId);
     void commentDelFail(const QString &reason);
+
+    //“我的上传”列表刷新结果
+    void myUploadsUpdated(qint64 userId, const QVector<MyUploadDto> &items);
 
     //统一日志出口：UI 只负责显示（低耦合）
     void logLine(const QString &line);
