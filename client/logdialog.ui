@@ -28,9 +28,6 @@
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <item alignment="Qt::AlignmentFlag::AlignHCenter">
     <widget class="QLabel" name="label">
-     <property name="styleSheet">
-      <string notr="true">font: 26pt &quot;Microsoft YaHei UI&quot;;</string>
-     </property>
      <property name="text">
       <string>学习资源共享平台</string>
      </property>
@@ -42,6 +39,12 @@
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
         <widget class="QLabel" name="label_2">
+         <property name="maximumSize">
+          <size>
+           <width>70</width>
+           <height>16777215</height>
+          </size>
+         </property>
          <property name="text">
           <string>用户名</string>
          </property>

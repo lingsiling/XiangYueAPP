@@ -1,0 +1,235 @@
+/* 
+   XiangYueAPP LogDialog 样式表 (QSS)
+   作者: GitHub Copilot
+   描述: 现代化的登录/注册界面美化
+   特性: 渐变背景、圆角按钮、阴影效果、响应式交互
+*/
+
+/* ============================================
+   主对话框样式
+   ============================================ */
+LogDialog {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #667eea,
+        stop:1 #764ba2
+    );
+    border-radius: 12px;
+}
+
+/* ============================================
+   标题标签样式 (学习资源共享平台)
+   ============================================ */
+LogDialog QLabel#label {
+    color: white;
+    font-family: "Verdana", "Microsoft YaHei UI", Arial, sans-serif;
+    font-size: 28pt;
+    font-weight: 600;
+    padding: 10px 0px 15px 0px;
+    background: transparent;
+    letter-spacing: 1px;
+    margin: 0px;
+}
+
+/* ============================================
+   普通标签样式 (用户名、密码)
+   ============================================ */
+LogDialog QLabel#label_2,
+LogDialog QLabel#label_3 {
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    background: transparent;
+    padding: 5px 10px;
+    letter-spacing: 1px;
+    min-height: 30px;
+    line-height: 30px;
+}
+
+/* ============================================
+   输入框样式 (用户名、密码)
+   ============================================ */
+LogDialog QLineEdit {
+    border: none;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 6px 15px;
+    color: white;
+    font-size: 13px;
+    min-height: 30px;
+    
+    /* 清晰的文字 */
+    selection-background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* 输入框获得焦点时的样式 */
+LogDialog QLineEdit:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.7);
+    outline: none;
+}
+
+/* 输入框占位符颜色 */
+LogDialog QLineEdit::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   登录按钮样式
+   ============================================ */
+LogDialog QPushButton#buttonlogin {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFD89B,
+        stop:1 #FF7043
+    );
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 30px;
+    font-size: 14px;
+    font-weight: bold;
+    
+    /* 阴影效果 */
+    outline: none;
+    
+    /* 字体效果 */
+    letter-spacing: 2px;
+    
+    /* 最小宽度 */
+    min-width: 150px;
+}
+
+/* 登录按钮鼠标悬停 */
+LogDialog QPushButton#buttonlogin:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFE5B4,
+        stop:1 #FF8A50
+    );
+    
+    /* 按钮稍微放大 */
+    outline: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 登录按钮按下 */
+LogDialog QPushButton#buttonlogin:pressed {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFC466,
+        stop:1 #FF6B35
+    );
+}
+
+/* ============================================
+   注册按钮样式
+   ============================================ */
+LogDialog QPushButton#buttonregister {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 8px;
+    padding: 12px 30px;
+    font-size: 14px;
+    font-weight: bold;
+    
+    /* 字体效果 */
+    letter-spacing: 2px;
+    
+    /* 最小宽度 */
+    min-width: 150px;
+}
+
+/* 注册按钮鼠标悬停 */
+LogDialog QPushButton#buttonregister:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+/* 注册按钮按下 */
+LogDialog QPushButton#buttonregister:pressed {
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+/* ============================================
+   隐藏占位符按钮样式 (用于对齐LineEdit)
+   ============================================ */
+LogDialog QPushButton#buttonHiddenSpacer {
+    background: transparent;
+    border: n5px 10px;
+    min-height: 3one;
+    padding: 0px;
+}
+
+/* ============================================
+   显示/隐藏密码按钮样式
+   ============================================ */
+LogDialog QPushButton#buttonShowOrHide {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 11px;
+    min-height: 30px;
+    font-weight: bold;
+}
+
+/* 显示/隐藏密码按钮鼠标悬停 */
+LogDialog QPushButton#buttonShowOrHide:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* 显示/隐藏密码按钮按下 */
+LogDialog QPushButton#buttonShowOrHide:pressed {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* ============================================
+   其他控件通用样式
+   ============================================ */
+
+/* 禁用状态 */
+LogDialog QPushButton:disabled {
+    background: rgba(0, 0, 0, 0.2);
+    color: rgba(255, 255, 255, 0.5);
+    border: none;
+}
+
+LogDialog QLineEdit:disabled {
+    background: rgba(0, 0, 0, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   滚动条样式 (如果有的话)
+   ============================================ */
+LogDialog QScrollBar:vertical {
+    background: rgba(255, 255, 255, 0.1);
+    width: 8px;
+    border-radius: 4px;
+}
+
+LogDialog QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+LogDialog QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   工具提示样式
+   ============================================ */
+LogDialog QToolTip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 11px;
+}

@@ -1,6 +1,13 @@
 QT += widgets network
 
 CONFIG += c++17
+CONFIG += debug_and_release
+
+# Debug configuration
+CONFIG(debug, debug|release) {
+    CONFIG += console
+    DEFINES += QT_MESSAGELOGCONTEXT
+}
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -37,7 +44,13 @@ FORMS += \
     favoritesdialog.ui \
     myuploaddialog.ui
 
+# 资源文件 (QSS 样式表)
+RESOURCES +=
+
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+RESOURCES += \
+    qss.qrc

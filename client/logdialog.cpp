@@ -4,12 +4,25 @@
 #include "fileclient.h"
 #include <QMessageBox>
 #include <QDebug>
+#include <QFile>
 
 LogDialog::LogDialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::LogDialog)
 {
     ui->setupUi(this);
+
+    // ===== 加载 QSS 样式表 =====
+    QFile styleFile(":/qss/logdialog_style.qss");
+    if (styleFile.open(QFile::ReadOnly)) {
+        QString styleSheet = styleFile.readAll();
+        this->setStyleSheet(styleSheet);
+        styleFile.close();
+        qDebug() << "LogDialog 样式表加载成功";
+    } else {
+        qDebug() << "LogDialog 样式表加载失败，请检查文件路径";
+    }
+    // ===== 样式表加载完毕 =====
 
     tcpSocket = new QTcpSocket(this);
 
