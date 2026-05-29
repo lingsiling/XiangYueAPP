@@ -24,6 +24,12 @@ LogDialog::LogDialog(QWidget *parent)
     }
     // ===== 样式表加载完毕 =====
 
+    // 设置 LineEdit 光标颜色
+    QPalette p = ui->nameline->palette();
+    p.setColor(QPalette::Text, QColor(255, 216, 155)); // #FFD89B 橙黄色
+    ui->nameline->setPalette(p);
+    ui->passline->setPalette(p);
+
     tcpSocket = new QTcpSocket(this);
 
     //一打开登陆界面就连接服务器

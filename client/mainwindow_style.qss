@@ -1,0 +1,223 @@
+/* 
+   XiangYueAPP MainWindow 样式表 (QSS)
+   作者: GitHub Copilot
+   描述: 现代化的主界面美化，与登录界面风格保持一致
+   特性: 蓝紫色渐变背景、圆角设计、玻璃态效果、响应式交互
+*/
+
+/* ============================================
+   主窗口样式
+   ============================================ */
+MainWindow {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #667eea,
+        stop:1 #764ba2
+    );
+}
+
+/* ============================================
+   中心部件样式
+   ============================================ */
+MainWindow QWidget {
+    background: transparent;
+}
+
+/* ============================================
+   左侧面板（侧边栏）样式
+   ============================================ */
+MainWindow QFrame#frame {
+    background: rgba(0, 0, 0, 0.15);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   右侧主内容区样式
+   ============================================ */
+MainWindow QFrame#frame_2 {
+    background: transparent;
+}
+
+/* ============================================
+   标签样式（头像、用户名等）
+   ============================================ */
+MainWindow QLabel#avatar {
+    border-radius: 40px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    padding: 0px;
+}
+
+MainWindow QLabel#username {
+    color: white;
+    font-size: 13px;
+    font-weight: bold;
+    background: transparent;
+    border: none;
+    padding: 5px 10px;
+}
+
+/* ============================================
+   按钮样式（导航菜单）
+   ============================================ */
+MainWindow QPushButton#buttonFavorite,
+MainWindow QPushButton#buttonMyUpload,
+MainWindow QPushButton#buttonUpload,
+MainWindow QPushButton#buttonSet {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+    margin: 5px;
+}
+
+MainWindow QPushButton#buttonFavorite:hover,
+MainWindow QPushButton#buttonMyUpload:hover,
+MainWindow QPushButton#buttonUpload:hover,
+MainWindow QPushButton#buttonSet:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+MainWindow QPushButton#buttonFavorite:pressed,
+MainWindow QPushButton#buttonMyUpload:pressed,
+MainWindow QPushButton#buttonUpload:pressed,
+MainWindow QPushButton#buttonSet:pressed {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* ============================================
+   搜索框和查询按钮样式
+   ============================================ */
+MainWindow QLineEdit#searchline {
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    padding: 8px 15px;
+    color: white;
+    font-size: 12px;
+    selection-background-color: rgba(255, 255, 255, 0.3);
+}
+
+MainWindow QLineEdit#searchline:focus {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+MainWindow QLineEdit#searchline::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   查询按钮样式
+   ============================================ */
+MainWindow QPushButton#buttonSearch {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFD89B,
+        stop:1 #FF7043
+    );
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 25px;
+    font-size: 12px;
+    font-weight: bold;
+    outline: none;
+}
+
+MainWindow QPushButton#buttonSearch:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFE5B4,
+        stop:1 #FF8A50
+    );
+}
+
+MainWindow QPushButton#buttonSearch:pressed {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFC466,
+        stop:1 #FF6B35
+    );
+}
+
+/* ============================================
+   列表组件样式
+   ============================================ */
+MainWindow QListWidget {
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+    padding: 8px;
+}
+
+MainWindow QListWidget::item {
+    padding: 8px;
+    border-radius: 6px;
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+    margin: 4px 0px;
+}
+
+MainWindow QListWidget::item:selected {
+    background: rgba(255, 165, 67, 0.4);
+    border-left: 3px solid #FF7043;
+}
+
+MainWindow QListWidget::item:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* ============================================
+   文本编辑框样式
+   ============================================ */
+MainWindow QTextEdit {
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+    padding: 10px;
+    font-size: 12px;
+}
+
+MainWindow QTextEdit:focus {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   滚动条样式
+   ============================================ */
+MainWindow QScrollBar:vertical {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 5px;
+    width: 8px;
+}
+
+MainWindow QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    min-height: 20px;
+}
+
+MainWindow QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   禁用状态样式
+   ============================================ */
+MainWindow QPushButton:disabled {
+    background: rgba(0, 0, 0, 0.2);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+MainWindow QLineEdit:disabled {
+    background: rgba(0, 0, 0, 0.15);
+    color: rgba(255, 255, 255, 0.5);
+}

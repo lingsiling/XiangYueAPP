@@ -7,12 +7,28 @@
 #include "transferdialog.h"
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFile>
+#include <QDebug>
+#include <QPainter>
+#include <QPainterPath>
 
 MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    // ===== 加载 QSS 样式表 =====
+    QFile styleFile(":/qss/mainwindow_style.qss");
+    if (styleFile.open(QFile::ReadOnly)) {
+        QString styleSheet = styleFile.readAll();
+        this->setStyleSheet(styleSheet);
+        styleFile.close();
+        qDebug() << "MainWindow 样式表加载成功";
+    } else {
+        qDebug() << "MainWindow 样式表加载失败，请检查文件路径";
+    }
+    // ===== 样式表加载完毕 =====
 
     tcpSocket = socket;
 
@@ -31,8 +47,10 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
             fn.endsWith(".jpeg", Qt::CaseInsensitive))
         {
             QPixmap pix(localPath);
-            if (!pix.isNull())
-                ui->avatar->setPixmap(pix.scaled(ui->avatar->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            if (!pix.isNull()) {
+                QPixmap scaled = pix.scaled(ui->avatar->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                setCircularAvatar(scaled);
+            }
         }
     });
 
@@ -99,7 +117,12 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 void MainWindow::refreshList(const QStringList &list)
 {
     ui->listWidget->clear();
-    ui->listWidget->addItems(list);
+    //过滤掉空字符串
+    for (const QString &item : list) {
+        if (!item.isEmpty()) {
+            ui->listWidget->addItem(item);
+        }
+    }
 }
 
 void MainWindow::setSession(const UserSession &s)
@@ -183,6 +206,41 @@ void MainWindow::showMyUploadDialog()
     });
 
     m_myUploadDialog->show();
+}
+
+void MainWindow::setCircularAvatar(const QPixmap &pixmap)
+{
+    if (pixmap.isNull()) {
+        qDebug() << "错误：传入的pixmap为空！";
+        return;
+    }
+    
+    // 创建圆形头像，使用标签的大小
+    QSize size = ui->avatar->size();
+    if (size.isEmpty()) {
+        size = QSize(120, 120);
+    }
+    
+    QPixmap circular(size);
+    circular.fill(Qt::transparent);
+    
+    QPainter painter(&circular);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    
+    // 绘制圆形路径
+    QPainterPath path;
+    path.addEllipse(0, 0, size.width(), size.height());
+    painter.setClipPath(path);
+    
+    // 缩放并绘制图片
+    QPixmap scaledPix = pixmap.scaledToWidth(size.width(), Qt::SmoothTransformation);
+    int y = (size.height() - scaledPix.height()) / 2;
+    painter.drawPixmap(0, y, scaledPix);
+    painter.end();
+    
+    qDebug() << "圆形头像创建成功，大小:" << size;
+    ui->avatar->setPixmap(circular);
 }
 
 MainWindow::~MainWindow()

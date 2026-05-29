@@ -37,7 +37,7 @@ private:
     void refreshList(const QStringList &list); //刷新UI
     void showUploadProgressDialog(); //显示上传进度条
     void showMyUploadDialog(); //显示“我的上传”UI
-private:
+    void setCircularAvatar(const QPixmap &pixmap); //设置圆形头像private:
     QTcpSocket *tcpSocket;//通信套接字
     FileClient *fileClient;//文件客户端对象
     TransferDialog *m_uploadDialog = nullptr; //上传进度条对话框

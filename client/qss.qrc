@@ -2,5 +2,6 @@
 <RCC>
     <qresource prefix="/qss">
         <file>logdialog_style.qss</file>
+        <file>mainwindow_style.qss</file>
     </qresource>
 </RCC>
