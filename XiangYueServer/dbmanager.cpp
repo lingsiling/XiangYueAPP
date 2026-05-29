@@ -94,13 +94,12 @@ bool DBManager::initSchema()
     //后续的“我的上传/收藏”会依赖这些表
     //建表顺序不强制，但按 users -> resources -> uploads -> favorites 更直观
 
-    //users：账号（用户名/密码hash/salt/头像路径）
+    //users：账号（用户名/密码/头像路径）
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            salt TEXT NOT NULL,
+            password TEXT NOT NULL,
             avatar TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );

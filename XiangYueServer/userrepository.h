@@ -12,8 +12,7 @@ struct UserRecord
 {
     qint64 id = 0;
     QString username;
-    QString passwordHash;
-    QString salt;
+    QString password;
     QString avatar;
 };
 
@@ -27,8 +26,7 @@ public:
 
     // 插入新用户；成功返回 true；失败（如 username 冲突）返回 false
     bool insertUser(const QString &username,
-                    const QString &passwordHash,
-                    const QString &salt,
+                    const QString &password,
                     const QString &avatar);
 };
 

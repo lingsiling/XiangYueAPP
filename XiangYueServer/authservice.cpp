@@ -1,21 +1,5 @@
 #include "authservice.h"
 
-#include <QCryptographicHash>
-#include <QUuid>
-
-QString AuthService::genSalt() const
-{
-    return QUuid::createUuid().toString(QUuid::WithoutBraces).left(16);
-}
-
-// 计算 hash,暂时不用 直接存明文密码（后续做安全加固时再改）
-// QString AuthService::hashPassword(const QString &salt, const QString &password) const
-// {
-//     QByteArray h = QCryptographicHash::hash((salt + password).toUtf8(),
-//                                             QCryptographicHash::Sha256).toHex();
-//     return QString::fromUtf8(h);
-// }
-
 AuthService::RegisterResult AuthService::registerUser(const QString &username, const QString &password)
 {
     RegisterResult r;
@@ -34,13 +18,10 @@ AuthService::RegisterResult AuthService::registerUser(const QString &username, c
         return r;
     }
 
-    const QString salt = "";//genSalt();
-    const QString hash = password;//hashPassword(salt, password);
-
     // 默认头像（先只存路径字符串；文件下载显示后面再做）
     const QString avatar = "avatars/default.png";
 
-    if (!m_repo.insertUser(u, hash, salt, avatar)) {
+    if (!m_repo.insertUser(u, password, avatar)) {
         r.ok = false;
         r.reason = "SERVER_ERROR";
         return r;
@@ -69,9 +50,8 @@ AuthService::LoginResult AuthService::login(const QString &username, const QStri
     }
 
     const UserRecord &rec = *recOpt;
-    //const QString inputHash = hashPassword(rec.salt, password);
 
-    if (password != rec.passwordHash) {
+    if (password != rec.password) {
         r.ok = false;
         r.reason = "WRONG_PASSWORD";
         return r;
