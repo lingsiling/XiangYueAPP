@@ -1,0 +1,120 @@
+/* 
+   XiangYueAPP FavoritesDialog 样式表 (QSS)
+   作者: GitHub Copilot
+   描述: 收藏夹对话框，保持与主界面一致的现代化设计
+   特性: 蓝紫色渐变背景、玻璃态效果、响应式交互
+*/
+
+/* ============================================
+   对话框样式
+   ============================================ */
+FavoritesDialog {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #667eea,
+        stop:1 #764ba2
+    );
+}
+
+/* ============================================
+   中心部件样式
+   ============================================ */
+FavoritesDialog QWidget {
+    background: transparent;
+}
+
+/* ============================================
+   标签样式
+   ============================================ */
+FavoritesDialog QLabel {
+    color: white;
+    font-size: 12px;
+    background: transparent;
+}
+
+/* ============================================
+   按钮样式（刷新等操作按钮）
+   ============================================ */
+FavoritesDialog QPushButton {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+}
+
+FavoritesDialog QPushButton:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+FavoritesDialog QPushButton:pressed {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* ============================================
+   列表组件样式
+   ============================================ */
+FavoritesDialog QListWidget {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    outline: none;
+    color: white;
+}
+
+FavoritesDialog QListWidget::item {
+    padding: 8px;
+    margin: 2px;
+}
+
+FavoritesDialog QListWidget::item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+FavoritesDialog QListWidget::item:selected {
+    background: rgba(255, 216, 155, 0.3);
+    border: 1px solid rgba(255, 216, 155, 0.5);
+}
+
+/* ============================================
+   滚动条样式
+   ============================================ */
+FavoritesDialog QScrollBar:vertical {
+    background: rgba(255, 255, 255, 0.1);
+    width: 8px;
+    border-radius: 4px;
+}
+
+FavoritesDialog QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+FavoritesDialog QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* ============================================
+   输入框样式
+   ============================================ */
+FavoritesDialog QLineEdit {
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 15px;
+    color: white;
+    font-size: 12px;
+}
+
+FavoritesDialog QLineEdit:focus {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+FavoritesDialog QLineEdit::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}

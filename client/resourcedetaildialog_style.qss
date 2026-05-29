@@ -1,0 +1,125 @@
+/* 
+   XiangYueAPP ResourceDetailDialog 样式表 (QSS)
+   作者: GitHub Copilot
+   描述: 资源详情对话框，保持与主界面一致的现代化设计
+   特性: 蓝紫色渐变背景、玻璃态效果、响应式交互
+*/
+
+/* ============================================
+   对话框样式
+   ============================================ */
+ResourceDetailDialog {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #667eea,
+        stop:1 #764ba2
+    );
+}
+
+/* ============================================
+   中心部件样式
+   ============================================ */
+ResourceDetailDialog QWidget {
+    background: transparent;
+}
+
+/* ============================================
+   标签样式（标题、文本信息）
+   ============================================ */
+ResourceDetailDialog QLabel {
+    color: white;
+    font-size: 12px;
+    background: transparent;
+}
+
+/* ============================================
+   下载/评论按钮样式
+   ============================================ */
+ResourceDetailDialog QPushButton {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFD89B,
+        stop:1 #FF7043
+    );
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 25px;
+    font-size: 12px;
+    font-weight: bold;
+    outline: none;
+}
+
+ResourceDetailDialog QPushButton:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFE5B4,
+        stop:1 #FF8A50
+    );
+}
+
+ResourceDetailDialog QPushButton:pressed {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFC466,
+        stop:1 #FF6B35
+    );
+}
+
+/* ============================================
+   文本编辑框样式（评论输入）
+   ============================================ */
+ResourceDetailDialog QTextEdit {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 10px;
+    color: white;
+    font-size: 12px;
+}
+
+ResourceDetailDialog QTextEdit:focus {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* ============================================
+   列表/树组件样式
+   ============================================ */
+ResourceDetailDialog QListWidget,
+ResourceDetailDialog QTreeWidget {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    outline: none;
+    color: white;
+}
+
+ResourceDetailDialog QListWidget::item:hover,
+ResourceDetailDialog QTreeWidget::item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+ResourceDetailDialog QListWidget::item:selected,
+ResourceDetailDialog QTreeWidget::item:selected {
+    background: rgba(255, 216, 155, 0.3);
+    border: 1px solid rgba(255, 216, 155, 0.5);
+}
+
+/* ============================================
+   滚动条样式
+   ============================================ */
+ResourceDetailDialog QScrollBar:vertical {
+    background: rgba(255, 255, 255, 0.1);
+    width: 8px;
+    border-radius: 4px;
+}
+
+ResourceDetailDialog QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+ResourceDetailDialog QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 0.4);
+}

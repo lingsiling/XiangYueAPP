@@ -2,6 +2,7 @@
 #include "ui_transferdialog.h"
 #include <QDebug>
 #include <QMessageBox>
+#include <QFile>
 
 /**
  * TransferDialog 构造函数
@@ -20,6 +21,13 @@ TransferDialog::TransferDialog(QWidget *parent)
 {
     //设置 UI
     ui->setupUi(this);
+
+    // 加载样式表
+    QFile file(":/qss/transferdialog_style.qss");
+    if (file.open(QFile::ReadOnly)) {
+        setStyleSheet(QLatin1String(file.readAll()));
+        file.close();
+    }
 
     //创建定时器（每 500ms 更新一次速度显示）
     m_speedTimer = new QTimer(this);

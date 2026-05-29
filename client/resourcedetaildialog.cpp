@@ -4,6 +4,7 @@
 #include <QMessageBox>
 #include <QListWidget>
 #include <QMenu>
+#include <QFile>
 
 //把 commentId/userId 存在 item->data()，避免 UI 解析字符串
 static constexpr int ROLE_COMMENT_ID = Qt::UserRole;
@@ -20,6 +21,13 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     m_userId(userId)
 {
     ui->setupUi(this);
+
+    // 加载样式表
+    QFile file(":/qss/resourcedetaildialog_style.qss");
+    if (file.open(QFile::ReadOnly)) {
+        setStyleSheet(QLatin1String(file.readAll()));
+        file.close();
+    }
 
     //显示资源名
     ui->labelResourceName->setText(m_resourceName);

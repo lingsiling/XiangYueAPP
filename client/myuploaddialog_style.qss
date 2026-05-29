@@ -1,0 +1,154 @@
+/* 
+   XiangYueAPP MyUploadDialog 样式表 (QSS)
+   作者: GitHub Copilot
+   描述: 我的上传对话框，保持与主界面一致的现代化设计
+   特性: 蓝紫色渐变背景、玻璃态效果、响应式交互
+*/
+
+/* ============================================
+   对话框样式
+   ============================================ */
+MyUploadDialog {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #667eea,
+        stop:1 #764ba2
+    );
+}
+
+/* ============================================
+   中心部件样式
+   ============================================ */
+MyUploadDialog QWidget {
+    background: transparent;
+}
+
+/* ============================================
+   标签样式
+   ============================================ */
+MyUploadDialog QLabel {
+    color: white;
+    font-size: 12px;
+    background: transparent;
+}
+
+/* ============================================
+   操作按钮样式（刷新、删除等）
+   ============================================ */
+MyUploadDialog QPushButton {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+}
+
+MyUploadDialog QPushButton:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+MyUploadDialog QPushButton:pressed {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* 删除按钮特殊样式 */
+MyUploadDialog QPushButton#buttonDelete {
+    background: rgba(255, 107, 53, 0.3);
+}
+
+MyUploadDialog QPushButton#buttonDelete:hover {
+    background: rgba(255, 107, 53, 0.4);
+}
+
+MyUploadDialog QPushButton#buttonDelete:pressed {
+    background: rgba(255, 107, 53, 0.5);
+}
+
+/* ============================================
+   列表组件样式
+   ============================================ */
+MyUploadDialog QListWidget {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    outline: none;
+    color: white;
+}
+
+MyUploadDialog QListWidget::item {
+    padding: 8px;
+    margin: 2px;
+}
+
+MyUploadDialog QListWidget::item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+MyUploadDialog QListWidget::item:selected {
+    background: rgba(255, 216, 155, 0.3);
+    border: 1px solid rgba(255, 216, 155, 0.5);
+}
+
+/* ============================================
+   表格组件样式
+   ============================================ */
+MyUploadDialog QTableWidget,
+MyUploadDialog QTableWidget::item {
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    color: white;
+}
+
+MyUploadDialog QTableWidget::item:selected {
+    background: rgba(255, 216, 155, 0.3);
+}
+
+MyUploadDialog QHeaderView::section {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    padding: 5px;
+    border: none;
+}
+
+/* ============================================
+   滚动条样式
+   ============================================ */
+MyUploadDialog QScrollBar:vertical {
+    background: rgba(255, 255, 255, 0.1);
+    width: 8px;
+    border-radius: 4px;
+}
+
+MyUploadDialog QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+MyUploadDialog QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* ============================================
+   输入框样式
+   ============================================ */
+MyUploadDialog QLineEdit {
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 15px;
+    color: white;
+    font-size: 12px;
+}
+
+MyUploadDialog QLineEdit:focus {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+MyUploadDialog QLineEdit::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}

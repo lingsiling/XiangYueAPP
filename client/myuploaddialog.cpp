@@ -3,6 +3,7 @@
 
 #include <QMessageBox>
 #include <QListWidgetItem>
+#include <QFile>
 
 MyUploadDialog::MyUploadDialog(FileClient *fileClient, qint64 userId, QWidget *parent)
     : QDialog(parent)
@@ -11,6 +12,13 @@ MyUploadDialog::MyUploadDialog(FileClient *fileClient, qint64 userId, QWidget *p
     , m_userId(userId)
 {
     ui->setupUi(this);
+
+    // 加载样式表
+    QFile file(":/qss/myuploaddialog_style.qss");
+    if (file.open(QFile::ReadOnly)) {
+        setStyleSheet(QLatin1String(file.readAll()));
+        file.close();
+    }
 
     //只负责“展示+交互”，数据请求交给 FileClient
     connect(ui->btnClose, &QPushButton::clicked, this, &QDialog::close);

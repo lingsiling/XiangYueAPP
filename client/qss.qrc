@@ -3,5 +3,9 @@
     <qresource prefix="/qss">
         <file>logdialog_style.qss</file>
         <file>mainwindow_style.qss</file>
+        <file>favoritesdialog_style.qss</file>
+        <file>resourcedetaildialog_style.qss</file>
+        <file>transferdialog_style.qss</file>
+        <file>myuploaddialog_style.qss</file>
     </qresource>
 </RCC>
