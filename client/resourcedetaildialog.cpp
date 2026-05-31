@@ -116,6 +116,17 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         QMessageBox::warning(this, "发送失败", reason);
     });
 
+    // 收藏成功处理
+    connect(m_fileClient, &FileClient::addFavoriteOk, this, [=](const QString &resourceName){
+        if (resourceName == m_resourceName) {
+            qDebug() << "[Favorite] 收藏成功" << m_resourceName;
+        }
+    });
+
+    connect(m_fileClient, &FileClient::addFavoriteFail, this, [=](const QString &reason){
+        qDebug() << "[Favorite] 收藏失败" << reason;
+    });
+
     // 打开详情页时先拉取评论列表
     m_fileClient->requestComments(m_resourceName);
 }
@@ -185,4 +196,19 @@ void ResourceDetailDialog::on_buttonComment_clicked()
 
     // content 支持换行；FileClient 会负责 base64 编码，协议层不耦合 UI
     m_fileClient->addComment(m_userId, m_resourceName, content);
+}
+
+void ResourceDetailDialog::on_buttonFavorite_clicked()
+{
+    if (!m_fileClient) {
+        QMessageBox::warning(this, "错误", "收藏模块未初始化");
+        return;
+    }
+    if (m_userId <= 0) {
+        QMessageBox::warning(this, "错误", "未登录，无法收藏");
+        return;
+    }
+
+    // 发送收藏命令到服务器
+    m_fileClient->addFavorite(m_resourceName);
 }

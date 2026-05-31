@@ -72,6 +72,8 @@ private:
     void handleCommentDelCommand(const QString &line);
     void handleDeleteResourceCommand(const QString &line);
     void handleMyUploadsCommand(const QString &line);
+    void handleAddFavoriteCommand(const QString &line);
+    void handleGetFavoritesCommand(const QString &line);
 
     //工具函数
     static QString toB64(const QString &s);

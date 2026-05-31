@@ -23,6 +23,7 @@ public:
 private slots:
     void on_buttonDownload_clicked();
     void on_buttonComment_clicked();
+    void on_buttonFavorite_clicked();
 
 private:
     Ui::ResourceDetailDialog *ui;

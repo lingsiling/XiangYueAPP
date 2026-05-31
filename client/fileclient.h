@@ -71,6 +71,12 @@ public:
     //我的上传删除：只传文件名，由服务端统一清理资源和上传记录
     void deleteMyUpload(const QString &fileName);
 
+    //收藏功能
+    void addFavorite(const QString &resourceName);
+    
+    // 获取收藏列表
+    void getFavorites(qint64 userId);
+
 private:
     //接收缓冲区：解决TCP粘包/拆包（命令行、FILE头）
     QByteArray m_buf;
@@ -148,8 +154,10 @@ signals:
 
     //“我的上传”列表刷新结果
     void myUploadsUpdated(qint64 userId, const QVector<MyUploadDto> &items);
-
-    //统一日志出口：UI 只负责显示（低耦合）
+    //收藏操作结果
+    void addFavoriteOk(const QString &resourceName);
+    void addFavoriteFail(const QString &reason);    // 收藏列表刷新结果
+    void favoritesUpdated(const QStringList &favorites);    //统一日志出口：UI 只负责显示（低耦合）
     void logLine(const QString &line);
 
     //下载进度信号

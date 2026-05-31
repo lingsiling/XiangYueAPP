@@ -134,9 +134,31 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit deleteMyUploadFail(reason);
         }
+        else if (line.startsWith("ADD_FAVORITE_OK##"))
+        {
+            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1, 1));
+            emit addFavoriteOk(resourceName);
+        }
+        else if (line.startsWith("ADD_FAVORITE_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit addFavoriteFail(reason);
+        }
+        else if (line.startsWith("GET_FAVORITES_OK##"))
+        {
+            const QString favoritesData = fromB64(QString::fromUtf8(line).section("##", 1, 1));
+            const QStringList favorites = favoritesData.split("||", Qt::SkipEmptyParts);
+            emit favoritesUpdated(favorites);
+        }
+        else if (line.startsWith("GET_FAVORITES_FAIL##"))
+        {
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            qWarning() << "[FileClient] 获取收藏列表失败:" << reason;
+            emit favoritesUpdated(QStringList());
+        }
         else
         {
-            //预留：收藏等命令
+            //预留：其他命令
         }
     }
 }
@@ -413,6 +435,25 @@ void FileClient::deleteMyUpload(const QString &fileName)
 
     //行协议：复用服务端现有资源删除入口，服务端会同步清理 resources/uploads
     const QString cmd = QString("DELETE_RESOURCE##%1\n").arg(name);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::addFavorite(const QString &resourceName)
+{
+    const QString name = resourceName.trimmed();
+    if (name.isEmpty()) return;
+
+    //行协议：ADD_FAVORITE##resourceName_b64
+    const QString cmd = QString("ADD_FAVORITE##%1\n").arg(toB64(name));
+    tcpSocket->write(cmd.toUtf8());
+}
+
+void FileClient::getFavorites(qint64 userId)
+{
+    if (userId <= 0) return;
+
+    // 行协议：GET_FAVORITES##
+    const QString cmd = QString("GET_FAVORITES##\n");
     tcpSocket->write(cmd.toUtf8());
 }
 

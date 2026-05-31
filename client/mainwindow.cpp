@@ -72,7 +72,7 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 
     // 我的收藏按钮：只负责弹出收藏 UI，不直接耦合收藏数据源
     connect(ui->buttonFavorite, &QPushButton::clicked, this, [this]() {
-        FavoritesDialog dlg(this);
+        FavoritesDialog dlg(this, fileClient, m_session.userId);
 
         // 刷新按钮点击后，先把信号抛出去，后续再按你的收藏模块接入数据刷新
         connect(&dlg, &FavoritesDialog::refreshRequested, this, [this]() {

@@ -16,6 +16,8 @@ SOURCES += \
     main.cpp \
     resourcerepository.cpp \
     resourceservice.cpp \
+    favoritesrepository.cpp \
+    favoritesservice.cpp \
     uploadrepository.cpp \
     uploadservice.cpp \
     serverwidget.cpp \
@@ -34,6 +36,9 @@ HEADERS += \
     dbmanager.h \
     resourcerepository.h \
     resourceservice.h \
+    favoriterecord.h \
+    favoritesrepository.h \
+    favoritesservice.h \
     serverwidget.h \
     taskqueue.h \
     threadedtcpserver.h \

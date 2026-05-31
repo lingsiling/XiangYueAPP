@@ -2,6 +2,7 @@
 #include "authservice.h"
 #include "commentservice.h"
 #include "resourceservice.h"
+#include "favoritesservice.h"
 #include "taskqueue.h"
 #include "dbconnectionpool.h"
 #include "uploadservice.h"
@@ -178,6 +179,12 @@ void ClientWorker::tryProcessLines()
         }
         else if (line.startsWith("MY_UPLOADS##")) {
             handleMyUploadsCommand(line);
+        }
+        else if (line.startsWith("ADD_FAVORITE##")) {
+            handleAddFavoriteCommand(line);
+        }
+        else if (line.startsWith("GET_FAVORITES##")) {
+            handleGetFavoritesCommand(line);
         }
     }
 }
@@ -510,6 +517,45 @@ void ClientWorker::handleMyUploadsCommand(const QString &line)
     }
 
     sendResponse(QString("MY_UPLOADS_END##%1\n").arg(userId));
+}
+
+void ClientWorker::handleAddFavoriteCommand(const QString &line)
+{
+    // 行协议：ADD_FAVORITE##resourceName_b64
+    const QString resourceName = fromB64(line.section("##", 1, 1));
+
+    qDebug() << "[Worker] 处理收藏请求，userId=" << m_currentUserId << "resourceName=" << resourceName;
+
+    FavoritesService service;
+    const auto res = service.addFavorite(m_currentUserId, resourceName);
+
+    if (res.ok) {
+        sendResponse(QString("ADD_FAVORITE_OK##%1\n").arg(toB64(resourceName)));
+    } else {
+        sendResponse(QString("ADD_FAVORITE_FAIL##%1\n").arg(res.reason));
+    }
+}
+
+void ClientWorker::handleGetFavoritesCommand(const QString &line)
+{
+    // 行协议：GET_FAVORITES##
+    qDebug() << "[Worker] 处理获取收藏列表请求，userId=" << m_currentUserId;
+
+    if (m_currentUserId <= 0) {
+        sendResponse(QString("GET_FAVORITES_FAIL##UNAUTHORIZED\n"));
+        return;
+    }
+
+    FavoritesService service;
+    const auto res = service.getFavorites(m_currentUserId);
+
+    if (res.ok) {
+        // 将所有资源名用 || 分隔返回
+        const QString favorites = res.favorites.join("||");
+        sendResponse(QString("GET_FAVORITES_OK##%1\n").arg(toB64(favorites)));
+    } else {
+        sendResponse(QString("GET_FAVORITES_FAIL##%1\n").arg(res.reason));
+    }
 }
 
 void ClientWorker::onTaskCompleted(const QString &taskType)
