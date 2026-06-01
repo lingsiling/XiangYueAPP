@@ -71,11 +71,17 @@ public:
     //我的上传删除：只传文件名，由服务端统一清理资源和上传记录
     void deleteMyUpload(const QString &fileName);
 
-    //收藏功能
+    //收藏功能：添加收藏（收藏/取消收藏的入口之一）
     void addFavorite(const QString &resourceName);
     
-    // 获取收藏列表
+    // 请求收藏列表：获取当前用户所有已收藏的资源名
     void getFavorites(qint64 userId);
+
+    // 取消收藏：将指定资源从收藏列表中移除（软删除）
+    void removeFavorite(const QString &resourceName);
+
+    // 检查收藏状态：查询某资源是否已被当前用户收藏，用于初始化按钮
+    void checkFavorite(const QString &resourceName);
 
 private:
     //接收缓冲区：解决TCP粘包/拆包（命令行、FILE头）
@@ -154,10 +160,17 @@ signals:
 
     //“我的上传”列表刷新结果
     void myUploadsUpdated(qint64 userId, const QVector<MyUploadDto> &items);
-    //收藏操作结果
+    //收藏操作结果：成功时返回资源名，UI 据此更新按钮状态
     void addFavoriteOk(const QString &resourceName);
-    void addFavoriteFail(const QString &reason);    // 收藏列表刷新结果
-    void favoritesUpdated(const QStringList &favorites);    //统一日志出口：UI 只负责显示（低耦合）
+    void addFavoriteFail(const QString &reason);
+    // 收藏列表刷新结果：打开收藏对话框时触发
+    void favoritesUpdated(const QStringList &favorites);
+    // 取消收藏结果：成功时返回资源名，UI 据此切换按钮文字
+    void removeFavoriteOk(const QString &resourceName);
+    void removeFavoriteFail(const QString &reason);
+    // 检查收藏结果：打开资源详情时触发，用于初始化"收藏/已收藏"按钮
+    void checkFavoriteOk(const QString &resourceName, bool isFavorited);
+    //统一日志出口：UI 只负责显示（低耦合）
     void logLine(const QString &line);
 
     //下载进度信号

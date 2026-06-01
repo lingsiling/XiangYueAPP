@@ -136,25 +136,48 @@ void FileClient::tryProcessLines()
         }
         else if (line.startsWith("ADD_FAVORITE_OK##"))
         {
+            // 收藏成功：解析资源名，通知 UI
             const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1, 1));
             emit addFavoriteOk(resourceName);
         }
         else if (line.startsWith("ADD_FAVORITE_FAIL##"))
         {
+            // 收藏失败：解析原因，通知 UI 展示错误
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit addFavoriteFail(reason);
         }
         else if (line.startsWith("GET_FAVORITES_OK##"))
         {
+            // 获取收藏列表成功：用 || 分隔多个资源名，通知 UI 刷新
             const QString favoritesData = fromB64(QString::fromUtf8(line).section("##", 1, 1));
             const QStringList favorites = favoritesData.split("||", Qt::SkipEmptyParts);
             emit favoritesUpdated(favorites);
         }
         else if (line.startsWith("GET_FAVORITES_FAIL##"))
         {
+            // 获取收藏列表失败：返回空列表，避免 UI 卡死
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             qWarning() << "[FileClient] 获取收藏列表失败:" << reason;
             emit favoritesUpdated(QStringList());
+        }
+        else if (line.startsWith("REMOVE_FAVORITE_OK##"))
+        {
+            // 取消收藏成功：解析资源名，通知 UI 更新按钮状态
+            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1, 1));
+            emit removeFavoriteOk(resourceName);
+        }
+        else if (line.startsWith("REMOVE_FAVORITE_FAIL##"))
+        {
+            // 取消收藏失败：通知 UI 展示错误原因
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit removeFavoriteFail(reason);
+        }
+        else if (line.startsWith("CHECK_FAVORITE_OK##"))
+        {
+            // 检查收藏状态返回：格式为 CHECK_FAVORITE_OK##资源名_b64##状态(0/1)\n
+            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1, 1));
+            const int isFavorited = QString::fromUtf8(line).section("##", 2, 2).toInt();
+            emit checkFavoriteOk(resourceName, isFavorited == 1);
         }
         else
         {
@@ -438,22 +461,46 @@ void FileClient::deleteMyUpload(const QString &fileName)
     tcpSocket->write(cmd.toUtf8());
 }
 
+// 发送收藏请求：客户端 UI 调用的入口，不关心协议细节
 void FileClient::addFavorite(const QString &resourceName)
 {
     const QString name = resourceName.trimmed();
     if (name.isEmpty()) return;
 
-    //行协议：ADD_FAVORITE##resourceName_b64
+    // 行协议：ADD_FAVORITE##resourceName_b64
     const QString cmd = QString("ADD_FAVORITE##%1\n").arg(toB64(name));
     tcpSocket->write(cmd.toUtf8());
 }
 
+// 请求收藏列表：服务端返回所有 is_active = 1 的收藏资源
 void FileClient::getFavorites(qint64 userId)
 {
     if (userId <= 0) return;
 
     // 行协议：GET_FAVORITES##
     const QString cmd = QString("GET_FAVORITES##\n");
+    tcpSocket->write(cmd.toUtf8());
+}
+
+// 发送取消收藏请求：软删除，服务端只更新 is_active = 0
+void FileClient::removeFavorite(const QString &resourceName)
+{
+    const QString name = resourceName.trimmed();
+    if (name.isEmpty()) return;
+
+    // 行协议：REMOVE_FAVORITE##resourceName_b64
+    const QString cmd = QString("REMOVE_FAVORITE##%1\n").arg(toB64(name));
+    tcpSocket->write(cmd.toUtf8());
+}
+
+// 查询指定资源的收藏状态：打开详情页时调用，用于初始化按钮文字
+void FileClient::checkFavorite(const QString &resourceName)
+{
+    const QString name = resourceName.trimmed();
+    if (name.isEmpty()) return;
+
+    // 行协议：CHECK_FAVORITE##resourceName_b64
+    const QString cmd = QString("CHECK_FAVORITE##%1\n").arg(toB64(name));
     tcpSocket->write(cmd.toUtf8());
 }
 

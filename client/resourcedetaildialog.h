@@ -31,6 +31,7 @@ private:
     QString m_resourceName;
     FileClient *m_fileClient = nullptr;
     qint64 m_userId = 0; // 当前登录用户 id（发送评论必须带上）
+    bool m_isFavorited = false; // 是否已收藏（用于切换按钮状态）
 };
 
 #endif // RESOURCEDETAILDIALOG_H

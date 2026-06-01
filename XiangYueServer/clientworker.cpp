@@ -186,6 +186,12 @@ void ClientWorker::tryProcessLines()
         else if (line.startsWith("GET_FAVORITES##")) {
             handleGetFavoritesCommand(line);
         }
+        else if (line.startsWith("REMOVE_FAVORITE##")) {
+            handleRemoveFavoriteCommand(line);
+        }
+        else if (line.startsWith("CHECK_FAVORITE##")) {
+            handleCheckFavoriteCommand(line);
+        }
     }
 }
 
@@ -519,6 +525,7 @@ void ClientWorker::handleMyUploadsCommand(const QString &line)
     sendResponse(QString("MY_UPLOADS_END##%1\n").arg(userId));
 }
 
+// 处理添加收藏命令：解析 Base64 资源名 → 调用 Service → 返回结果
 void ClientWorker::handleAddFavoriteCommand(const QString &line)
 {
     // 行协议：ADD_FAVORITE##resourceName_b64
@@ -536,6 +543,7 @@ void ClientWorker::handleAddFavoriteCommand(const QString &line)
     }
 }
 
+// 处理获取收藏列表命令：调用 Service → 返回所有资源名（|| 分隔，Base64 编码）
 void ClientWorker::handleGetFavoritesCommand(const QString &line)
 {
     // 行协议：GET_FAVORITES##
@@ -550,11 +558,55 @@ void ClientWorker::handleGetFavoritesCommand(const QString &line)
     const auto res = service.getFavorites(m_currentUserId);
 
     if (res.ok) {
-        // 将所有资源名用 || 分隔返回
+        // 将所有资源名用 || 分隔返回，客户端按 Qt::SkipEmptyParts 拆分
         const QString favorites = res.favorites.join("||");
         sendResponse(QString("GET_FAVORITES_OK##%1\n").arg(toB64(favorites)));
     } else {
         sendResponse(QString("GET_FAVORITES_FAIL##%1\n").arg(res.reason));
+    }
+}
+
+// 处理取消收藏命令：软删除，走 Service → Repository 更新 is_active = 0
+void ClientWorker::handleRemoveFavoriteCommand(const QString &line)
+{
+    // 行协议：REMOVE_FAVORITE##resourceName_b64
+    const QString resourceName = fromB64(line.section("##", 1, 1));
+
+    qDebug() << "[Worker] 处理取消收藏请求，userId=" << m_currentUserId << "resourceName=" << resourceName;
+
+    FavoritesService service;
+    const auto res = service.removeFavorite(m_currentUserId, resourceName);
+
+    if (res.ok) {
+        sendResponse(QString("REMOVE_FAVORITE_OK##%1\n").arg(toB64(resourceName)));
+    } else {
+        sendResponse(QString("REMOVE_FAVORITE_FAIL##%1\n").arg(res.reason));
+    }
+}
+
+// 处理检查收藏状态命令：返回 0/1，用于资源详情页初始化收藏按钮文字
+void ClientWorker::handleCheckFavoriteCommand(const QString &line)
+{
+    // 行协议：CHECK_FAVORITE##resourceName_b64
+    const QString resourceName = fromB64(line.section("##", 1, 1));
+
+    qDebug() << "[Worker] 检查收藏状态，userId=" << m_currentUserId << "resourceName=" << resourceName;
+
+    if (m_currentUserId <= 0) {
+        // 未登录，安全返回未收藏
+        sendResponse(QString("CHECK_FAVORITE_OK##%1##0\n").arg(toB64(resourceName)));
+        return;
+    }
+
+    FavoritesService service;
+    const auto res = service.checkFavorite(m_currentUserId, resourceName);
+
+    if (res.ok) {
+        const int isFavorited = res.isFavorited ? 1 : 0;
+        sendResponse(QString("CHECK_FAVORITE_OK##%1##%2\n").arg(toB64(resourceName)).arg(isFavorited));
+    } else {
+        // 查询出错时默认返回未收藏，保证安全
+        sendResponse(QString("CHECK_FAVORITE_OK##%1##0\n").arg(toB64(resourceName)));
     }
 }
 

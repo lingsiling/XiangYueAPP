@@ -22,11 +22,28 @@ public:
         QString reason;  // 错误原因
     };
 
+    struct RemoveFavoriteResult {
+        bool ok = false;
+        QString reason;  // UNAUTHORIZED / RESOURCE_NOT_FOUND / DATABASE_ERROR
+    };
+
+    struct CheckFavoriteResult {
+        bool ok = false;
+        bool isFavorited = false;  // 是否已收藏
+        QString reason;  // 错误原因
+    };
+
     // 添加收藏
     AddFavoriteResult addFavorite(qint64 userId, const QString &resourceName);
 
     // 获取用户的收藏列表
     GetFavoritesResult getFavorites(qint64 userId);
+
+    // 删除收藏
+    RemoveFavoriteResult removeFavorite(qint64 userId, const QString &resourceName);
+
+    // 检查资源是否被收藏
+    CheckFavoriteResult checkFavorite(qint64 userId, const QString &resourceName);
 
 private:
     FavoritesRepository m_repo;

@@ -129,11 +129,15 @@ bool DBManager::initSchema()
     )SQL", "create uploads")) return false;
 
     // favorites：收藏（用户-资源 多对多），UNIQUE 防止重复收藏
+    // is_active: 1=已收藏, 0=已取消(软删除)
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             resource_id INTEGER NOT NULL,
+            is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, resource_id)
         );
     )SQL", "create favorites")) return false;

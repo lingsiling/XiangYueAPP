@@ -43,7 +43,7 @@ MyUploadDialog::MyUploadDialog(FileClient *fileClient, qint64 userId, QWidget *p
         // 删除前二次确认，避免误操作
         const auto ret = QMessageBox::question(this,
                                               "确认删除",
-                                              QString("确定删除选中的上传资源：%1 吗？\n该操作会同时删除 resources 和 uploads 记录。").arg(fileName),
+                                              QString("确定删除选中的上传资源：%1 吗？\n该操作会同时删除 resources , uploads 和 favorites 记录。").arg(fileName),
                                               QMessageBox::Yes | QMessageBox::No,
                                               QMessageBox::No);
         if (ret != QMessageBox::Yes)

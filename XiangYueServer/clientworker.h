@@ -72,8 +72,10 @@ private:
     void handleCommentDelCommand(const QString &line);
     void handleDeleteResourceCommand(const QString &line);
     void handleMyUploadsCommand(const QString &line);
-    void handleAddFavoriteCommand(const QString &line);
-    void handleGetFavoritesCommand(const QString &line);
+    void handleAddFavoriteCommand(const QString &line);  // 处理收藏请求
+    void handleGetFavoritesCommand(const QString &line);  // 处理获取收藏列表请求
+    void handleRemoveFavoriteCommand(const QString &line);  // 处理取消收藏请求
+    void handleCheckFavoriteCommand(const QString &line);  // 处理检查收藏状态请求
 
     //工具函数
     static QString toB64(const QString &s);

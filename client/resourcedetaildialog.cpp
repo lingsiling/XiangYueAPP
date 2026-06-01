@@ -18,11 +18,12 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     ui(new Ui::ResourceDetailDialog),
     m_resourceName(resourceName),
     m_fileClient(fileClient),
-    m_userId(userId)
+    m_userId(userId),
+    m_isFavorited(false)  // 初始状态为未收藏，会通过 checkFavorite 更新
 {
     ui->setupUi(this);
 
-    // 加载样式表
+    //加载样式表
     QFile file(":/qss/resourcedetaildialog_style.qss");
     if (file.open(QFile::ReadOnly)) {
         setStyleSheet(QLatin1String(file.readAll()));
@@ -31,6 +32,9 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
 
     //显示资源名
     ui->labelResourceName->setText(m_resourceName);
+
+    // 初始化按钮文字为"收藏"
+    ui->buttonFavorite->setText("收藏");
 
     if (!m_fileClient) return;
 
@@ -116,19 +120,51 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         QMessageBox::warning(this, "发送失败", reason);
     });
 
-    // 收藏成功处理
+    //收藏成功处理
     connect(m_fileClient, &FileClient::addFavoriteOk, this, [=](const QString &resourceName){
         if (resourceName == m_resourceName) {
+            m_isFavorited = true;
+            ui->buttonFavorite->setText("已收藏");
             qDebug() << "[Favorite] 收藏成功" << m_resourceName;
         }
     });
 
     connect(m_fileClient, &FileClient::addFavoriteFail, this, [=](const QString &reason){
+        if (reason != "ALREADY_FAVORITED") {
+            QMessageBox::warning(this, "收藏失败", reason);
+        }
         qDebug() << "[Favorite] 收藏失败" << reason;
+    });
+
+    connect(m_fileClient, &FileClient::removeFavoriteOk, this, [=](const QString &resourceName){
+        if (resourceName == m_resourceName) {
+            m_isFavorited = false;
+            ui->buttonFavorite->setText("收藏");
+            qDebug() << "[Favorite] 取消收藏成功" << m_resourceName;
+        }
+    });
+
+    connect(m_fileClient, &FileClient::removeFavoriteFail, this, [=](const QString &reason){
+        QMessageBox::warning(this, "取消收藏失败", reason);
+        qDebug() << "[Favorite] 取消收藏失败" << reason;
+    });
+
+    // 检查收藏状态结果处理
+    connect(m_fileClient, &FileClient::checkFavoriteOk, this, [=](const QString &resourceName, bool isFavorited){
+        if (resourceName == m_resourceName) {
+            m_isFavorited = isFavorited;
+            ui->buttonFavorite->setText(m_isFavorited ? "已收藏" : "收藏");
+            qDebug() << "[Favorite] 收藏状态检查完成" << m_resourceName << ":" << (m_isFavorited ? "已收藏" : "未收藏");
+        }
     });
 
     // 打开详情页时先拉取评论列表
     m_fileClient->requestComments(m_resourceName);
+
+    // 打开详情页时检查收藏状态
+    if (m_userId > 0) {
+        m_fileClient->checkFavorite(m_resourceName);
+    }
 }
 
 ResourceDetailDialog::~ResourceDetailDialog()
@@ -209,6 +245,12 @@ void ResourceDetailDialog::on_buttonFavorite_clicked()
         return;
     }
 
-    // 发送收藏命令到服务器
-    m_fileClient->addFavorite(m_resourceName);
+    // 根据当前收藏状态，调用相应的函数
+    if (m_isFavorited) {
+        // 已收藏，点击取消收藏
+        m_fileClient->removeFavorite(m_resourceName);
+    } else {
+        // 未收藏，点击收藏
+        m_fileClient->addFavorite(m_resourceName);
+    }
 }

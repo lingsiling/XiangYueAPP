@@ -18,6 +18,9 @@ public:
 
     // 获取用户的收藏资源列表（返回资源文件名列表）
     QStringList getFavoritesByUserId(qint64 userId);
+
+    // 删除收藏：返回是否成功
+    bool removeFavorite(qint64 userId, qint64 resourceId);
 };
 
 #endif // FAVORITESREPOSITORY_H
