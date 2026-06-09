@@ -117,16 +117,31 @@ bool DBManager::initSchema()
         );
     )SQL", "create resources")) return false;
 
-    //uploads：上传记录（如果只关心“每个文件当前上传者”，resources.uploader_user_id 也够用）
-    //这里先建着，未来做“上传历史/统计”更方便
+    // uploads：上传记录表
+    // session_id 关联 upload_sessions 表，NULL 表示旧数据（单文件上传）
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS uploads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             resource_id INTEGER NOT NULL,
+            session_id INTEGER,                         -- 关联的批次ID（新增字段）
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     )SQL", "create uploads")) return false;
+
+    // upload_sessions：上传批次表（新增）
+    // 一次上传创建一个批次，可包含多个文件，附带标签和资源介绍
+    // tags 用逗号分隔，description 为纯文本
+    if (!execOrLog(R"SQL(
+        CREATE TABLE IF NOT EXISTS upload_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,                   -- 上传者
+            tags TEXT DEFAULT '',                        -- 标签（逗号分隔）
+            description TEXT DEFAULT '',                 -- 资源介绍
+            file_count INTEGER DEFAULT 0,                -- 本次上传文件数
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    )SQL", "create upload_sessions")) return false;
 
     // favorites：收藏（用户-资源 多对多），UNIQUE 防止重复收藏
     // is_active: 1=已收藏, 0=已取消(软删除)
@@ -147,6 +162,11 @@ bool DBManager::initSchema()
         CREATE INDEX IF NOT EXISTS idx_resources_uploader
         ON resources(uploader_user_id);
     )SQL", "create idx_resources_uploader")) return false;
+
+    if (!execOrLog(R"SQL(
+        CREATE INDEX IF NOT EXISTS idx_uploads_session
+        ON uploads(session_id);
+    )SQL", "create idx_uploads_session")) return false;
 
     if (!execOrLog(R"SQL(
         CREATE INDEX IF NOT EXISTS idx_uploads_user

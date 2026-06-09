@@ -54,8 +54,18 @@ public:
     //单文件上传
     void uploadFile(QString filePath);
 
-    //多文件上传：把文件路径加入队列，按顺序逐个上传
+    //多文件上传：把文件路径加入队列，按顺序逐个上传（旧接口，保留兼容）
     void uploadFiles(const QStringList &filePaths);
+
+    // ====== 批次上传：一次上传包含多个文件 + 标签 + 资源介绍 ======
+    // 协议三步流程：
+    //   1. UPLOAD_BATCH##文件数##userId##标签(B64)##介绍(B64)\n   …批次头
+    //   2. FILE##文件大小##文件名(B64)\n + 二进制数据                  …逐文件发送
+    //   3. 服务端回复 BATCH_OK##sessionId\n                         …入库确认
+    void uploadBatch(const QStringList &filePaths,
+                     qint64 userId,
+                     const QStringList &tags,
+                     const QString &desc);
     void requestList();
     void downloadFile(QString fileName);
 
@@ -143,8 +153,11 @@ private:
     static QString fromB64(const QString &b64);
 
 signals:
-    void resourcesUpdated(const QStringList &list); //服务端列表更新时发出
-    void fileReceived(const QString &fileName, const QString &localPath); //任何 FILE 下载完成通知
+    void resourcesUpdated(const QStringList &list);  // 服务端文件列表更新时发出
+    void fileReceived(const QString &fileName, const QString &localPath);  // 文件下载完成
+
+    // 批次上传完成通知（sessionId = upload_sessions.id）
+    void batchUploadFinished(qint64 sessionId);
 
     //评论列表拉取完成（一次性返回，UI 刷新更简单）
     void commentsUpdated(const QString &resourceName, const QVector<CommentDto> &comments);

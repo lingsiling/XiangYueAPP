@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>580</height>
+    <width>640</width>
+    <height>620</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -21,19 +21,19 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayoutMain">
    <property name="spacing">
-    <number>14</number>
+    <number>12</number>
    </property>
    <property name="leftMargin">
     <number>20</number>
    </property>
    <property name="topMargin">
-    <number>20</number>
+    <number>16</number>
    </property>
    <property name="rightMargin">
     <number>20</number>
    </property>
    <property name="bottomMargin">
-    <number>20</number>
+    <number>16</number>
    </property>
    <item>
     <widget class="QLabel" name="labelTitle">
@@ -52,71 +52,12 @@
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayoutFileInfo">
-     <property name="spacing">
-      <number>10</number>
-     </property>
+    <layout class="QHBoxLayout" name="horizontalLayoutSelect">
      <item>
-      <widget class="QLabel" name="labelFile">
+      <widget class="QPushButton" name="btnSelectFiles">
        <property name="minimumSize">
         <size>
-         <width>60</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>已选文件：</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="lineEditFilePath">
-       <property name="readOnly">
-        <bool>true</bool>
-       </property>
-       <property name="placeholderText">
-        <string>请选择要上传的文件</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QLabel" name="labelFileSize">
-     <property name="text">
-      <string>文件大小：--</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="horizontalLayoutActions">
-     <property name="spacing">
-      <number>10</number>
-     </property>
-     <item>
-      <widget class="QPushButton" name="btnAddTag">
-       <property name="minimumSize">
-        <size>
-         <width>110</width>
-         <height>36</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>添加标签</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btnUploadFile">
-       <property name="minimumSize">
-        <size>
-         <width>110</width>
+         <width>120</width>
          <height>36</height>
         </size>
        </property>
@@ -126,39 +67,129 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btnPreview">
+      <widget class="QPushButton" name="btnClearFiles">
        <property name="minimumSize">
         <size>
-         <width>110</width>
+         <width>120</width>
          <height>36</height>
         </size>
        </property>
        <property name="text">
-        <string>预览</string>
+        <string>清除选中</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacerSelect">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTreeWidget" name="treeWidgetFiles">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>160</height>
+      </size>
+     </property>
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+     </property>
+     <property name="rootIsDecorated">
+      <bool>false</bool>
+     </property>
+     <property name="columnCount">
+      <number>3</number>
+     </property>
+     <attribute name="headerDefaultSectionSize">
+      <number>180</number>
+     </attribute>
+     <attribute name="headerStretchLastSection">
+      <bool>true</bool>
+     </attribute>
+     <column>
+      <property name="text">
+       <string>文件名</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>大小</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>类型</string>
+      </property>
+     </column>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelFileStats">
+     <property name="text">
+      <string>已选 0 个文件</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayoutTag">
+     <item>
+      <widget class="QLabel" name="labelTagsTitle">
+       <property name="text">
+        <string>标签：</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEditTag">
+       <property name="placeholderText">
+        <string>输入标签名，回车添加</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnAddTag">
+       <property name="minimumSize">
+        <size>
+         <width>80</width>
+         <height>30</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>添加</string>
        </property>
       </widget>
      </item>
     </layout>
    </item>
    <item>
-    <widget class="QLabel" name="labelTagsTitle">
-     <property name="text">
-      <string>已添加标签：</string>
-     </property>
-    </widget>
-   </item>
-   <item>
     <widget class="QListWidget" name="listWidgetTags">
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>80</height>
+       <height>54</height>
       </size>
      </property>
      <property name="maximumSize">
       <size>
        <width>16777215</width>
-       <height>80</height>
+       <height>54</height>
       </size>
      </property>
      <property name="selectionMode">
@@ -184,7 +215,13 @@
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>120</height>
+       <height>80</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>80</height>
       </size>
      </property>
      <property name="placeholderText">
@@ -194,9 +231,6 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayoutBottom">
-     <property name="spacing">
-      <number>12</number>
-     </property>
      <item>
       <spacer name="horizontalSpacerLeft">
        <property name="orientation">

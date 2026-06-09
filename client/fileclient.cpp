@@ -80,6 +80,24 @@ void FileClient::tryProcessLines()
             m_isUploading = false;
             startNextUpload();
         }
+        else if (line.startsWith("BATCH_OK##"))
+        {
+            // ============================================================
+            //  服务端批次入库成功回复：BATCH_OK##sessionId
+            //  sessionId 对应 upload_sessions 表的 id，后续可查历史
+            //  收到后自动请求 LIST 刷新主界面，让用户看到刚上传的全部文件
+            // ============================================================
+            const qint64 sessionId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+            emit logLine(QString("批次上传完成！批次ID: %1").arg(sessionId));
+            emit batchUploadFinished(sessionId);     // 通知关注者（如 MainWindow）
+            requestList();                           // 刷新主界面列表
+        }
+        else if (line.startsWith("BATCH_FAIL##"))
+        {
+            // 服务端批次入库失败：BATCH_FAIL##失败原因
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit logLine(QString("批次上传失败: %1").arg(reason));
+        }
         else if (line.startsWith("COMMENT_BEGIN##"))
         {
             handleCommentBegin(line);
@@ -544,4 +562,84 @@ void FileClient::handleMyUploadsEnd(const QByteArray &line)
 
     m_myUploadsUserId = 0;
     m_pendingMyUploads.clear();
+}
+
+// ====== 批次上传：一次上传包含多个文件 + 标签 + 介绍 ======
+// 协议顺序：
+//   1. 先发 UPLOAD_BATCH##文件数##userId##标签(B64)##介绍(B64)\n
+//   2. 然后逐个发 FILE##文件大小##文件名(B64)\n + 二进制数据
+//   3. 全部发完后，服务端事务入库 → 回复 BATCH_OK##sessionId
+//
+// 与旧 uploadFiles 的区别：
+//   - uploadFiles：逐个文件独立上传，每个文件立即入库、立即回复 UPLOAD_OK
+//   - uploadBatch：  整个批次在服务端事务中统一入库，全部成功才回复 BATCH_OK
+//
+// 参数：
+//   filePaths - 用户选中的全部文件绝对路径
+//   userId    - 当前登录用户ID
+//   tags      - 标签列表（如 {"数学", "PPT"}）
+//   desc      - 资源介绍文字
+void FileClient::uploadBatch(const QStringList &filePaths,
+                             qint64 userId,
+                             const QStringList &tags,
+                             const QString &desc)
+{
+    if (!tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState) {
+        emit logLine("上传失败：未连接服务器");
+        return;
+    }
+    if (filePaths.isEmpty()) return;
+
+    // ====== 第1步：发送批次头 ======
+    // 格式：UPLOAD_BATCH##文件数##userId##标签(B64)##介绍(B64)
+    // 服务端收到后会记录 m_batchFileCount，进入"批次上传模式"
+    const QString tagsStr = tags.join(',');
+    const QString batchHead = QString("UPLOAD_BATCH##%1##%2##%3##%4\n")
+        .arg(filePaths.size())
+        .arg(userId)
+        .arg(toB64(tagsStr))       // Base64 编码避免中文/逗号破坏协议
+        .arg(toB64(desc));         // Base64 编码避免换行/## 破坏协议
+    tcpSocket->write(batchHead.toUtf8());
+
+    emit logLine(QString("开始批次上传：共 %1 个文件").arg(filePaths.size()));
+
+    // ====== 第2步：逐个发送文件 ======
+    for (const QString &filePath : filePaths) {
+        QFileInfo info(filePath.trimmed());
+        if (!info.exists() || !info.isFile()) {
+            emit logLine(QString("跳过不存在文件：%1").arg(filePath));
+            continue;
+        }
+
+        QFile f(filePath);
+        if (!f.open(QIODevice::ReadOnly)) {
+            emit logLine(QString("无法打开文件：%1").arg(filePath));
+            continue;
+        }
+
+        const qint64 size = f.size();
+
+        // 发送文件头：FILE##大小##文件名(B64)
+        // 文件名用 Base64 编码，避免中文字符破坏协议解析
+        const QString fileHead = QString("FILE##%1##%2\n")
+            .arg(size)
+            .arg(toB64(info.fileName()));
+        tcpSocket->write(fileHead.toUtf8());
+
+        // 发送文件二进制内容（4KB 分块）
+        qint64 sent = 0;
+        while (sent < size) {
+            QByteArray chunk = f.read(4096);
+            if (chunk.isEmpty()) break;
+            tcpSocket->write(chunk);
+            sent += chunk.size();
+        }
+
+        f.close();
+        emit logLine(QString("  已发送：%1 (%2 字节)")
+            .arg(info.fileName())
+            .arg(size));
+    }
+
+    emit logLine("批次文件发送完毕，等待服务端确认...");
 }

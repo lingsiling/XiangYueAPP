@@ -72,10 +72,15 @@ private:
     void handleCommentDelCommand(const QString &line);
     void handleDeleteResourceCommand(const QString &line);
     void handleMyUploadsCommand(const QString &line);
-    void handleAddFavoriteCommand(const QString &line);  // 处理收藏请求
-    void handleGetFavoritesCommand(const QString &line);  // 处理获取收藏列表请求
-    void handleRemoveFavoriteCommand(const QString &line);  // 处理取消收藏请求
-    void handleCheckFavoriteCommand(const QString &line);  // 处理检查收藏状态请求
+    void handleAddFavoriteCommand(const QString &line);
+    void handleGetFavoritesCommand(const QString &line);
+    void handleRemoveFavoriteCommand(const QString &line);
+    void handleCheckFavoriteCommand(const QString &line);
+
+    //批次上传
+    void handleBatchUploadCommand(const QString &line);   // 解析 UPLOAD_BATCH 头
+    void finalizeBatchUpload();                             // 批次收尾
+    void finalizeSingleUpload(const QString &filePath);     // 单文件收尾（也走批次入库）
 
     //工具函数
     static QString toB64(const QString &s);
@@ -92,7 +97,7 @@ private:
     //网络缓冲区
     QByteArray m_buf;
 
-    //上传状态（每连接独立）
+    // 上传状态：每个连接独立的普通上传
     bool m_isUploadIdle;
     QString m_uploadFileName;
     qint64 m_uploadFileSize;
@@ -100,6 +105,13 @@ private:
     QFile m_uploadFile;
     qint64 m_uploadUserId;
     qint64 m_currentUserId;
+
+    // 批次上传状态：一次上传包含多个文件
+    QStringList m_batchFilePaths;       // 本批次已接收完成的文件绝对路径
+    QStringList m_batchTags;            // 本批次的标签列表（从客户端解析得到）
+    QString m_batchDesc;                // 本批次的资源介绍
+    qint64 m_batchFileCount = 0;        // 客户端声明的文件总数（UPLOAD_BATCH 头中指定）
+    qint64 m_batchRecvCount = 0;        // 已接收完成的文件计数（到达 fileCount 时触发入库）
 
     //路径配置
     QString m_saveDir;
