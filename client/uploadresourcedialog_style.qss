@@ -1,0 +1,244 @@
+/*
+   XiangYueAPP UploadResourceDialog 样式表 (QSS)
+   描述: 上传资源对话框，保持与主界面一致的现代化设计
+   特性: 蓝紫色渐变背景、玻璃态效果、圆角按钮、响应式交互
+*/
+
+/* ============================================
+   对话框样式
+   ============================================ */
+UploadResourceDialog {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #667eea,
+        stop:1 #764ba2
+    );
+}
+
+/* ============================================
+   中心部件样式
+   ============================================ */
+UploadResourceDialog QWidget {
+    background: transparent;
+}
+
+/* ============================================
+   标题标签样式
+   ============================================ */
+UploadResourceDialog QLabel#labelTitle {
+    color: white;
+    font-family: "Verdana", "Microsoft YaHei UI", Arial, sans-serif;
+    font-size: 18pt;
+    font-weight: 600;
+    padding: 5px 0px 10px 0px;
+    background: transparent;
+}
+
+/* ============================================
+   普通标签样式
+   ============================================ */
+UploadResourceDialog QLabel#labelFile,
+UploadResourceDialog QLabel#labelTagsTitle,
+UploadResourceDialog QLabel#labelDescTitle {
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    padding: 3px 0px;
+}
+
+/* ============================================
+   文件大小标签样式
+   ============================================ */
+UploadResourceDialog QLabel#labelFileSize {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    background: transparent;
+    padding: 2px 0px;
+}
+
+/* ============================================
+   输入框样式
+   ============================================ */
+UploadResourceDialog QLineEdit {
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 8px 15px;
+    color: white;
+    font-size: 12px;
+    selection-background-color: rgba(255, 216, 155, 0.5);
+}
+
+UploadResourceDialog QLineEdit:focus {
+    background: rgba(255, 255, 255, 0.18);
+    border-bottom: 2px solid #FFD89B;
+    outline: none;
+}
+
+UploadResourceDialog QLineEdit::placeholder {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+/* ============================================
+   操作按钮样式（添加标签、选择文件、预览）
+   ============================================ */
+UploadResourceDialog QPushButton#btnAddTag,
+UploadResourceDialog QPushButton#btnUploadFile,
+UploadResourceDialog QPushButton#btnPreview {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+}
+
+UploadResourceDialog QPushButton#btnAddTag:hover,
+UploadResourceDialog QPushButton#btnUploadFile:hover,
+UploadResourceDialog QPushButton#btnPreview:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+UploadResourceDialog QPushButton#btnAddTag:pressed,
+UploadResourceDialog QPushButton#btnUploadFile:pressed,
+UploadResourceDialog QPushButton#btnPreview:pressed {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* ============================================
+   上传按钮样式（主要操作）
+   ============================================ */
+UploadResourceDialog QPushButton#btnSubmit {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFD89B,
+        stop:1 #FF7043
+    );
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-size: 13px;
+    font-weight: bold;
+    outline: none;
+    letter-spacing: 1px;
+}
+
+UploadResourceDialog QPushButton#btnSubmit:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFE5B4,
+        stop:1 #FF8A50
+    );
+}
+
+UploadResourceDialog QPushButton#btnSubmit:pressed {
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:1,
+        stop:0 #FFC466,
+        stop:1 #FF6B35
+    );
+}
+
+/* ============================================
+   取消按钮样式
+   ============================================ */
+UploadResourceDialog QPushButton#btnCancel {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+    letter-spacing: 1px;
+}
+
+UploadResourceDialog QPushButton#btnCancel:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+UploadResourceDialog QPushButton#btnCancel:pressed {
+    background: rgba(255, 255, 255, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   多行输入框样式（资源介绍）
+   ============================================ */
+UploadResourceDialog QTextEdit {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    color: white;
+    font-size: 12px;
+    selection-background-color: rgba(255, 216, 155, 0.4);
+}
+
+UploadResourceDialog QTextEdit:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 216, 155, 0.5);
+}
+
+/* ============================================
+   标签列表样式
+   ============================================ */
+UploadResourceDialog QListWidget {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    outline: none;
+    color: white;
+    padding: 4px;
+}
+
+UploadResourceDialog QListWidget::item {
+    background: rgba(255, 216, 155, 0.2);
+    color: #FFD89B;
+    border: 1px solid rgba(255, 216, 155, 0.3);
+    border-radius: 10px;
+    padding: 4px 12px;
+    margin: 2px;
+}
+
+UploadResourceDialog QListWidget::item:hover {
+    background: rgba(255, 216, 155, 0.3);
+    border: 1px solid rgba(255, 216, 155, 0.5);
+}
+
+UploadResourceDialog QListWidget::item:selected {
+    background: rgba(255, 107, 53, 0.35);
+    border: 1px solid rgba(255, 107, 53, 0.5);
+    color: white;
+}
+
+/* ============================================
+   滚动条样式
+   ============================================ */
+UploadResourceDialog QScrollBar:vertical {
+    background: rgba(255, 255, 255, 0.08);
+    width: 8px;
+    border-radius: 4px;
+}
+
+UploadResourceDialog QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+}
+
+UploadResourceDialog QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+UploadResourceDialog QScrollBar::add-line:vertical,
+UploadResourceDialog QScrollBar::sub-line:vertical {
+    height: 0px;
+}

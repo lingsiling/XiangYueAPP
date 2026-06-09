@@ -7,5 +7,6 @@
         <file>resourcedetaildialog_style.qss</file>
         <file>transferdialog_style.qss</file>
         <file>myuploaddialog_style.qss</file>
+        <file>uploadresourcedialog_style.qss</file>
     </qresource>
 </RCC>

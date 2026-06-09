@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "favoritesdialog.h"
 #include "myuploaddialog.h"
+#include "uploadresourcedialog.h"
 #include "resourcedetaildialog.h"
 #include "fileclient.h"
 #include "transferdialog.h"
@@ -87,15 +88,10 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         showMyUploadDialog();
     });
 
-    //上传按钮（可多选）
+    //上传按钮 → 打开上传资源详情UI
     connect(ui->buttonUpload, &QPushButton::clicked, this, [=]() {
-
-        const QStringList paths = QFileDialog::getOpenFileNames(this, "选择文件（可多选）");
-        if (paths.isEmpty()) return;
-        //显示上传进度条
-        showUploadProgressDialog();
-        //UI 只调用接口，不关心“队列/协议/确认机制”
-        fileClient->uploadFiles(paths);
+        UploadResourceDialog dlg(fileClient, m_session.userId, this);
+        dlg.exec();
     });
 
     // 双击资源列表项：跳转到资源详情页

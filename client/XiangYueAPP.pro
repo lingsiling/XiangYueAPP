@@ -23,6 +23,7 @@ SOURCES += \
     resourcedetaildialog.cpp \
     resourcesearch.cpp \
     transferdialog.cpp \
+    uploadresourcedialog.cpp \
     usersession.cpp
 
 HEADERS += \
@@ -34,6 +35,7 @@ HEADERS += \
     resourcedetaildialog.h \
     resourcesearch.h \
     transferdialog.h \
+    uploadresourcedialog.h \
     usersession.h
 
 FORMS += \
@@ -42,7 +44,8 @@ FORMS += \
     resourcedetaildialog.ui \
     transferdialog.ui \
     favoritesdialog.ui \
-    myuploaddialog.ui
+    myuploaddialog.ui \
+    uploadresourcedialog.ui
 
 # 资源文件 (QSS 样式表)
 RESOURCES +=
