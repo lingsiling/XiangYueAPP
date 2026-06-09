@@ -84,3 +84,66 @@ bool UploadRepository::deleteByResourceId(qint64 resourceId)
 
 	return true;
 }
+
+// ====== 按批次ID查询该批次的所有文件 ======
+QList<ResourceRecord> UploadRepository::listBySessionId(qint64 sessionId)
+{
+    QList<ResourceRecord> list;
+    if (sessionId <= 0) return list;
+
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare(R"SQL(
+        SELECT r.id, r.filename, r.server_path, r.size, r.uploader_user_id, r.uploaded_at
+        FROM resources r
+        INNER JOIN uploads u ON u.resource_id = r.id
+        WHERE u.session_id = ?
+        ORDER BY r.filename
+    )SQL");
+    q.addBindValue(sessionId);
+
+    if (!q.exec()) {
+        qDebug() << "[UploadRepo] listBySessionId failed:" << q.lastError().text();
+        return list;
+    }
+
+    while (q.next()) {
+        ResourceRecord rec;
+        rec.id = q.value(0).toLongLong();
+        rec.filename = q.value(1).toString();
+        rec.serverPath = q.value(2).toString();
+        rec.size = q.value(3).toLongLong();
+        rec.uploaderUserId = q.value(4).toLongLong();
+        rec.uploadedAt = q.value(5).toString();
+        list.append(rec);
+    }
+    return list;
+}
+
+// ====== 查询所有批次列表（主界面展示用） ======
+QList<UploadRepository::SessionRow> UploadRepository::listAllSessions()
+{
+    QList<SessionRow> list;
+
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare(R"SQL(
+        SELECT id, user_id, tags, description, file_count, created_at
+        FROM upload_sessions ORDER BY created_at DESC
+    )SQL");
+
+    if (!q.exec()) {
+        qDebug() << "[UploadRepo] listAllSessions failed:" << q.lastError().text();
+        return list;
+    }
+
+    while (q.next()) {
+        SessionRow row;
+        row.id = q.value(0).toLongLong();
+        row.userId = q.value(1).toLongLong();
+        row.tags = q.value(2).toString();
+        row.description = q.value(3).toString();
+        row.fileCount = q.value(4).toInt();
+        row.createdAt = q.value(5).toString();
+        list.append(row);
+    }
+    return list;
+}

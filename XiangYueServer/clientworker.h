@@ -59,9 +59,11 @@ private:
     void sendFile(const QString &fileName);
 
     //命令分发（分为同步和异步两类）
-    //同步命令：直接执行（快速返回）
+    // 同步命令
     void handleListCommand();
     void handleDownloadCommand(const QString &line);
+    void handleListSessionsCommand();                     // 新：返回批次列表
+    void handleSessionFilesCommand(const QString &line);  // 新：返回某批次的文件列表
 
     //异步命令：提交到TaskQueue（耗时操作）
     void handleRegisterCommand(const QString &line);

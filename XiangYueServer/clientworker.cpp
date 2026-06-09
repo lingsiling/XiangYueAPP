@@ -127,6 +127,14 @@ void ClientWorker::tryProcessLines()
         if (line == "LIST") {
             handleListCommand();
         }
+        else if (line == "LIST_SESSIONS") {
+            // 新：返回所有批次列表（替代旧 LIST）
+            handleListSessionsCommand();
+        }
+        else if (line.startsWith("SESSION_FILES##")) {
+            // 新：返回某批次的文件列表
+            handleSessionFilesCommand(line);
+        }
         else if (line.startsWith("DOWNLOAD##")) {
             const QString fn = line.section("##", 1, 1).trimmed();
             handleDownloadCommand(fn);
@@ -729,7 +737,64 @@ void ClientWorker::finalizeSingleUpload(const QString &filePath)
 void ClientWorker::onTaskError(const QString &taskType, const QString &error)
 {
     qWarning() << "[Worker] 任务出错:" << taskType << "错误:" << error;
-    sendResponse("ERROR##SERVER_ERROR\n");
+}
+
+// ====== 返回所有上传批次列表（主界面展示用） ======
+// 协议格式：SESSIONS_BEGIN##总数
+//           SESSION_ITEM##id##userId##tags(B64)##desc(B64)##fileCount##createdAt
+//           SESSIONS_END
+void ClientWorker::handleListSessionsCommand()
+{
+    UploadRepository repo;
+    const auto sessions = repo.listAllSessions();
+
+    // 发送批次总数
+    const QString begin = QString("SESSIONS_BEGIN##%1\n").arg(sessions.size());
+    m_socket->write(begin.toUtf8());
+
+    // 逐条发送每个批次的元信息
+    for (const auto &s : sessions) {
+        const QString item = QString("SESSION_ITEM##%1##%2##%3##%4##%5##%6\n")
+            .arg(s.id)
+            .arg(s.userId)
+            .arg(toB64(s.tags))
+            .arg(toB64(s.description))
+            .arg(s.fileCount)
+            .arg(toB64(s.createdAt));
+        m_socket->write(item.toUtf8());
+    }
+
+    const QString end = QString("SESSIONS_END\n");
+    m_socket->write(end.toUtf8());
+}
+
+// ====== 返回某个批次的文件列表（点击批次后展示用） ======
+// 协议格式：SESSION_FILES_BEGIN##sessionId##文件数
+//           FILE_ITEM##id##filename(B64)##size##uploadedAt(B64)
+//           SESSION_FILES_END##sessionId
+void ClientWorker::handleSessionFilesCommand(const QString &line)
+{
+    const qint64 sid = line.section("##", 1, 1).toLongLong();
+    if (sid <= 0) return;
+
+    UploadRepository repo;
+    const auto files = repo.listBySessionId(sid);
+
+    const QString begin = QString("SESSION_FILES_BEGIN##%1##%2\n")
+        .arg(sid).arg(files.size());
+    m_socket->write(begin.toUtf8());
+
+    for (const auto &f : files) {
+        const QString item = QString("FILE_ITEM##%1##%2##%3##%4\n")
+            .arg(f.id)
+            .arg(toB64(f.filename))
+            .arg(f.size)
+            .arg(toB64(f.uploadedAt));
+        m_socket->write(item.toUtf8());
+    }
+
+    const QString end = QString("SESSION_FILES_END##%1\n").arg(sid);
+    m_socket->write(end.toUtf8());
 }
 
 QString ClientWorker::toB64(const QString &s)

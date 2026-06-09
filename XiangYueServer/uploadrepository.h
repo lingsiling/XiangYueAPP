@@ -1,6 +1,8 @@
 #ifndef UPLOADREPOSITORY_H
 #define UPLOADREPOSITORY_H
 
+#include "resourcerepository.h"
+
 #include <QString>
 #include <optional>
 
@@ -17,13 +19,24 @@
 class UploadRepository
 {
 public:
-    // 新增一条上传记录：由上层传入用户 ID 和资源 ID
     std::optional<qint64> insert(qint64 userId, qint64 resourceId);
 
-    // 按文件名新增上传记录：后续如果改成按文件名关联，可在 service 层直接调用
-    std::optional<qint64> insertByFileName(qint64 userId, const QString &filename);
+    // 按 session_id 查询该批次的所有文件记录
+    // 返回值是 resources 表中属于该批次的全部条目
+    QList<ResourceRecord> listBySessionId(qint64 sessionId);
 
-    // 按资源 ID 删除上传记录：用于资源删除时同步清理 uploads
+    // 查询所有批次（upload_sessions 表），按时间倒序
+    struct SessionRow {
+        qint64 id = 0;
+        qint64 userId = 0;
+        QString tags;
+        QString description;
+        int fileCount = 0;
+        QString createdAt;
+    };
+    QList<SessionRow> listAllSessions();
+
+    std::optional<qint64> insertByFileName(qint64 userId, const QString &filename);
     bool deleteByResourceId(qint64 resourceId);
 };
 

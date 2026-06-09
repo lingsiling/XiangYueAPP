@@ -17,11 +17,17 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     : QDialog(parent),
     ui(new Ui::ResourceDetailDialog),
     m_resourceName(resourceName),
+    m_sessionId(0),
     m_fileClient(fileClient),
     m_userId(userId),
-    m_isFavorited(false)  // 初始状态为未收藏，会通过 checkFavorite 更新
+    m_isFavorited(false)
 {
     ui->setupUi(this);
+
+    // 尝试解析为 sessionId（新批次协议）
+    bool ok = false;
+    m_sessionId = resourceName.toLongLong(&ok);
+    if (!ok) m_sessionId = 0;
 
     //加载样式表
     QFile file(":/qss/resourcedetaildialog_style.qss");
@@ -30,13 +36,32 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         file.close();
     }
 
-    //显示资源名
-    ui->labelResourceName->setText(m_resourceName);
-
-    // 初始化按钮文字为"收藏"
+    ui->labelSessionTitle->setText(m_resourceName);
     ui->buttonFavorite->setText("收藏");
 
     if (!m_fileClient) return;
+
+    // ====== 新协议：按 sessionId 加载批次文件 ======
+    if (m_sessionId > 0) {
+        // 监听批次文件列表返回
+        connect(m_fileClient, &FileClient::sessionFilesUpdated, this,
+            [=](qint64 sid, const QVector<ResourceDto> &files)
+            {
+                if (sid != m_sessionId) return;
+                ui->treeWidgetFiles->clear();
+                for (const auto &f : files) {
+                    auto *item = new QTreeWidgetItem();
+                    item->setText(0, f.filename);
+                    item->setText(1, QString::number(f.size));
+                    item->setText(2, f.uploadedAt);
+                    ui->treeWidgetFiles->addTopLevelItem(item);
+                }
+            });
+        // 请求该批次的文件列表
+        m_fileClient->requestSessionFiles(m_sessionId);
+        // 请求该批次的文件列表
+        m_fileClient->requestSessionFiles(m_sessionId);
+    }
 
     //UI 只监听 FileClient 的信号，不关心协议/数据库
     connect(m_fileClient, &FileClient::commentsUpdated, this,
@@ -172,47 +197,6 @@ ResourceDetailDialog::~ResourceDetailDialog()
     delete ui;
 }
 
-void ResourceDetailDialog::on_buttonDownload_clicked()
-{
-    if(!m_fileClient)
-    {
-        QMessageBox::warning(this, "错误", "下载模块未初始化");
-        return;
-    }
-    if(m_resourceName.isEmpty())
-    {
-        QMessageBox::warning(this, "错误", "资源名为空，无法下载");
-        return;
-    }
-
-    //创建进度对话框
-    TransferDialog *dlg = new TransferDialog(this);
-    dlg->setFileName(m_resourceName);
-    dlg->setTransferType(TransferDialog::Download);
-
-    //使用 Lambda 连接信号
-    connect(m_fileClient,
-            QOverload<const QString&, qint64, qint64, int>::of(&FileClient::downloadProgress),
-            dlg,
-            &TransferDialog::updateProgress);
-
-    connect(m_fileClient, &FileClient::downloadFinished,
-            dlg, &TransferDialog::completeTransfer);
-
-    connect(dlg, &TransferDialog::cancelRequested,
-            m_fileClient, &FileClient::cancelDownloadRequested);
-
-    dlg->show();
-
-    //立即开始下载
-    qDebug() << "[Download] 开始下载:" << m_resourceName;
-    m_fileClient->downloadFile(m_resourceName);
-
-    //清理：对话框关闭时删除
-    connect(dlg, &TransferDialog::finished,
-            [dlg]() { dlg->deleteLater(); });
-}
-
 void ResourceDetailDialog::on_buttonComment_clicked()
 {
     if (!m_fileClient) {
@@ -253,4 +237,10 @@ void ResourceDetailDialog::on_buttonFavorite_clicked()
         // 未收藏，点击收藏
         m_fileClient->addFavorite(m_resourceName);
     }
+}
+
+// 已废弃：UI 中 buttonDownload 改名为 buttonDownloadAll
+// 保留空实现避免 MOC 生成的代码链接报错
+void ResourceDetailDialog::on_buttonDownload_clicked()
+{
 }

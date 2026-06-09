@@ -37,8 +37,8 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 
     fileClient = new FileClient(tcpSocket, this);
 
-    //进入自动请求列表
-    fileClient->requestList();
+    // 改为请求批次列表（替代旧 LIST）
+    fileClient->requestAllSessions();
 
     //连接 fileReceived 更新 QLabel（只处理头像文件名）
     connect(fileClient, &FileClient::fileReceived, this, [=](const QString &fn, const QString &localPath){
@@ -55,15 +55,23 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         }
     });
 
-    //接收服务端列表更新
-    connect(fileClient, &FileClient::resourcesUpdated, this, [=](const QStringList &list){
-        m_allResources = list;
-        m_search.setAllResources(list);
-
-        //如果搜索框为空，显示全量；否则保持当前搜索结果
-        QString key = ui->searchline->text();
-        refreshList(m_search.filter(key));
+    // 接收服务端批次列表更新（新协议）
+    connect(fileClient, &FileClient::sessionsUpdated, this, [=](const QVector<SessionDto> &sessions){
+        ui->listWidget->clear();
+        for (const auto &s : sessions) {
+            // 列表显示：标签  文件数  ·  时间
+            const QString tagsStr = s.tags.isEmpty() ? "(无标签)" : s.tags;
+            const QString text = QString("[%1]  %2 个文件  ·  %3")
+                .arg(tagsStr)
+                .arg(s.fileCount)
+                .arg(s.createdAt);
+            auto *item = new QListWidgetItem(text);
+            item->setData(Qt::UserRole, s.id);  // 存 sessionId
+            ui->listWidget->addItem(item);
+        }
     });
+
+    // 保留旧 LIST 兼容（通过 resourcesUpdated 信号）
 
     //搜索按钮
     connect(ui->buttonSearch, &QPushButton::clicked, this, [=](){
@@ -94,14 +102,19 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         dlg.exec();
     });
 
-    // 双击资源列表项：跳转到资源详情页
+    // 双击列表项：根据列表类型打开详情页
     connect(ui->listWidget, &QListWidget::itemDoubleClicked, this, [=](QListWidgetItem *item){
-
-        QString resourceName = item->text();
-        // 打开资源详情对话框（模态）
-        // 这里把资源名、fileClient 传给详情页，详情页里点“下载”再触发下载
-        ResourceDetailDialog dlg(this, resourceName, fileClient, m_session.userId);
-        dlg.exec();
+        const qint64 sessionId = item->data(Qt::UserRole).toLongLong();
+        if (sessionId > 0) {
+            // 有 sessionId → 是批次列表，打开 ResourceDetailDialog 展示批次文件
+            ResourceDetailDialog dlg(this, QString::number(sessionId), fileClient, m_session.userId);
+            dlg.exec();
+        } else {
+            // 无 sessionId → 旧协议单文件
+            const QString resourceName = item->text();
+            ResourceDetailDialog dlg(this, resourceName, fileClient, m_session.userId);
+            dlg.exec();
+        }
     });
 
     //UI追加日志输出

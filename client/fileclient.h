@@ -34,10 +34,30 @@ struct CommentDto
     QString content;
 };
 
-//MyUploadDto：客户端“我的上传”列表项
+//MyUploadDto：客户端"我的上传"列表项（旧协议，保留兼容）
 struct MyUploadDto
 {
     QString fileName;
+    qint64 size = 0;
+    QString uploadedAt;
+};
+
+// 上传批次DTO：主界面列表中的一条
+struct SessionDto
+{
+    qint64 id = 0;
+    qint64 userId = 0;
+    QString tags;
+    QString description;
+    int fileCount = 0;
+    QString createdAt;
+};
+
+// 批次内单个文件DTO
+struct ResourceDto
+{
+    qint64 id = 0;
+    QString filename;
     qint64 size = 0;
     QString uploadedAt;
 };
@@ -66,6 +86,10 @@ public:
                      qint64 userId,
                      const QStringList &tags,
                      const QString &desc);
+
+    // ====== 新增：批次列表协议 ======
+    void requestAllSessions();                          // 请求所有上传批次（替代旧 LIST）
+    void requestSessionFiles(qint64 sessionId);         // 请求某批次的文件列表（点击后调用）
     void requestList();
     void downloadFile(QString fileName);
 
@@ -115,6 +139,13 @@ private:
     qint64 m_myUploadsUserId = 0;
     QVector<MyUploadDto> m_pendingMyUploads;
 
+    //批次列表解析缓存
+    QVector<SessionDto> m_pendingSessions;
+
+    //批次内文件列表解析缓存
+    qint64 m_pendingSessionId = 0;
+    QVector<ResourceDto> m_pendingResources;
+
     //上传队列（多文件上传核心）
     struct UploadTask {
         QString path;      //本地路径
@@ -147,6 +178,16 @@ private:
     void handleMyUploadsItem(const QByteArray &line);
     void handleMyUploadsEnd(const QByteArray &line);
 
+    // 批次列表解析
+    void handleSessionsBegin(const QByteArray &line);
+    void handleSessionItem(const QByteArray &line);
+    void handleSessionsEnd();
+
+    // 批次内文件列表解析
+    void handleSessionFilesBegin(const QByteArray &line);
+    void handleFileItem(const QByteArray &line);
+    void handleSessionFilesEnd(const QByteArray &line);
+
     // Base64 工具：
     // content 允许换行，必须 base64 后再放入行协议
     static QString toB64(const QString &s);
@@ -158,6 +199,12 @@ signals:
 
     // 批次上传完成通知（sessionId = upload_sessions.id）
     void batchUploadFinished(qint64 sessionId);
+
+    // 批次列表更新（主界面展示用）
+    void sessionsUpdated(const QVector<SessionDto> &sessions);
+
+    // 某批次文件列表（ResourceDetailDialog 展示用）
+    void sessionFilesUpdated(qint64 sessionId, const QVector<ResourceDto> &files);
 
     //评论列表拉取完成（一次性返回，UI 刷新更简单）
     void commentsUpdated(const QString &resourceName, const QVector<CommentDto> &comments);

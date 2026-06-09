@@ -89,8 +89,8 @@ void FileClient::tryProcessLines()
             // ============================================================
             const qint64 sessionId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
             emit logLine(QString("批次上传完成！批次ID: %1").arg(sessionId));
-            emit batchUploadFinished(sessionId);     // 通知关注者（如 MainWindow）
-            requestList();                           // 刷新主界面列表
+            emit batchUploadFinished(sessionId);     // 通知关注者
+            requestAllSessions();                      // 新协议：刷新批次列表
         }
         else if (line.startsWith("BATCH_FAIL##"))
         {
@@ -101,6 +101,31 @@ void FileClient::tryProcessLines()
         else if (line.startsWith("COMMENT_BEGIN##"))
         {
             handleCommentBegin(line);
+        }
+        else if (line.startsWith("SESSIONS_BEGIN##"))
+        {
+            // 解析服务端返回的批次列表
+            handleSessionsBegin(line);
+        }
+        else if (line.startsWith("SESSION_ITEM##"))
+        {
+            handleSessionItem(line);
+        }
+        else if (line.startsWith("SESSIONS_END"))
+        {
+            handleSessionsEnd();
+        }
+        else if (line.startsWith("SESSION_FILES_BEGIN##"))
+        {
+            handleSessionFilesBegin(line);
+        }
+        else if (line.startsWith("FILE_ITEM##"))
+        {
+            handleFileItem(line);
+        }
+        else if (line.startsWith("SESSION_FILES_END##"))
+        {
+            handleSessionFilesEnd(line);
         }
         else if (line.startsWith("COMMENT_ITEM##"))
         {
@@ -642,4 +667,77 @@ void FileClient::uploadBatch(const QStringList &filePaths,
     }
 
     emit logLine("批次文件发送完毕，等待服务端确认...");
+}
+
+// ====== 请求所有上传批次列表（替代旧 LIST） ======
+void FileClient::requestAllSessions()
+{
+    tcpSocket->write("LIST_SESSIONS\n");
+}
+
+// ====== 请求某个批次的文件列表（点击批次后） ======
+void FileClient::requestSessionFiles(qint64 sessionId)
+{
+    if (sessionId <= 0) return;
+    const QString cmd = QString("SESSION_FILES##%1\n").arg(sessionId);
+    tcpSocket->write(cmd.toUtf8());
+}
+
+// ====== 解析批次列表 ======
+void FileClient::handleSessionsBegin(const QByteArray & /*line*/)
+{
+    // SESSIONS_BEGIN##总数
+    m_pendingSessions.clear();
+}
+
+void FileClient::handleSessionItem(const QByteArray &line)
+{
+    // SESSION_ITEM##id##userId##tags(B64)##desc(B64)##fileCount##createdAt(B64)
+    const QString s = QString::fromUtf8(line);
+    SessionDto dto;
+    dto.id = s.section("##", 1, 1).toLongLong();
+    dto.userId = s.section("##", 2, 2).toLongLong();
+    dto.tags = fromB64(s.section("##", 3, 3));
+    dto.description = fromB64(s.section("##", 4, 4));
+    dto.fileCount = s.section("##", 5, 5).toInt();
+    dto.createdAt = fromB64(s.section("##", 6, 6));
+    m_pendingSessions.append(dto);
+}
+
+void FileClient::handleSessionsEnd()
+{
+    emit sessionsUpdated(m_pendingSessions);
+    m_pendingSessions.clear();
+}
+
+// ====== 解析批次内文件列表 ======
+void FileClient::handleSessionFilesBegin(const QByteArray &line)
+{
+    // SESSION_FILES_BEGIN##sessionId##文件数
+    const QString s = QString::fromUtf8(line);
+    m_pendingSessionId = s.section("##", 1, 1).toLongLong();
+    m_pendingResources.clear();
+}
+
+void FileClient::handleFileItem(const QByteArray &line)
+{
+    // FILE_ITEM##id##filename(B64)##size##uploadedAt(B64)
+    const QString s = QString::fromUtf8(line);
+    ResourceDto dto;
+    dto.id = s.section("##", 1, 1).toLongLong();
+    dto.filename = fromB64(s.section("##", 2, 2));
+    dto.size = s.section("##", 3, 3).toLongLong();
+    dto.uploadedAt = fromB64(s.section("##", 4, 4));
+    m_pendingResources.append(dto);
+}
+
+void FileClient::handleSessionFilesEnd(const QByteArray &line)
+{
+    // SESSION_FILES_END##sessionId
+    const qint64 sid = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+    if (sid == m_pendingSessionId) {
+        emit sessionFilesUpdated(sid, m_pendingResources);
+    }
+    m_pendingSessionId = 0;
+    m_pendingResources.clear();
 }
