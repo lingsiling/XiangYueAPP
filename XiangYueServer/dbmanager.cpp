@@ -91,116 +91,86 @@ bool DBManager::execOrLog(const QString &sql, const char *tag)
 
 bool DBManager::initSchema()
 {
-    //后续的“我的上传/收藏”会依赖这些表
-    //建表顺序不强制，但按 users -> resources -> uploads -> favorites 更直观
+    // ================================================================
+    //  享阅 数据库表结构
+    //  设计原则：最小够用，只保留必要字段
+    //  表之间通过 id 关联，SQLite 不强制外键约束
+    // ================================================================
 
-    //users：账号（用户名/密码/头像路径）
+    // ---------- 1. 用户表 ----------
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            avatar TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            username   TEXT    NOT NULL UNIQUE,
+            password   TEXT    NOT NULL,
+            avatar     TEXT,
+            created_at TEXT    DEFAULT CURRENT_TIMESTAMP
         );
     )SQL", "create users")) return false;
 
-    //resources：资源/文件表（把服务器上的文件“入库”，便于查询某用户上传了哪些文件）
+    // ---------- 2. 资源文件表 ----------
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS resources (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT NOT NULL UNIQUE,
-            server_path TEXT,
-            size INTEGER,
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename         TEXT    NOT NULL UNIQUE,
+            server_path      TEXT,
+            size             INTEGER,
             uploader_user_id INTEGER,
-            uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP
+            uploaded_at      TEXT    DEFAULT CURRENT_TIMESTAMP
         );
     )SQL", "create resources")) return false;
 
-    // uploads：上传记录表
-    // session_id 关联 upload_sessions 表，NULL 表示旧数据（单文件上传）
-    if (!execOrLog(R"SQL(
-        CREATE TABLE IF NOT EXISTS uploads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            resource_id INTEGER NOT NULL,
-            session_id INTEGER,                         -- 关联的批次ID（新增字段）
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        );
-    )SQL", "create uploads")) return false;
-
-    // upload_sessions：上传批次表（新增）
-    // 一次上传创建一个批次，可包含多个文件，附带标签和资源介绍
-    // tags 用逗号分隔，description 为纯文本
+    // ---------- 3. 上传批次表 ----------
+    // 一次上传 = 一个批次，可包含多个文件
+    // description = "批次名|资源介绍" 格式
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS upload_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,                   -- 上传者
-            tags TEXT DEFAULT '',                        -- 标签（逗号分隔）
-            description TEXT DEFAULT '',                 -- 资源介绍
-            file_count INTEGER DEFAULT 0,                -- 本次上传文件数
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            tags        TEXT    DEFAULT '',
+            description TEXT    DEFAULT '',
+            file_count  INTEGER DEFAULT 0,
+            created_at  TEXT    DEFAULT CURRENT_TIMESTAMP
         );
     )SQL", "create upload_sessions")) return false;
 
-    // favorites：收藏（用户-资源 多对多），UNIQUE 防止重复收藏
-    // is_active: 1=已收藏, 0=已取消(软删除)
+    // ---------- 4. 上传记录表 ----------
+    // 记录每个文件属于哪个批次
+    // session_id 为 NULL 表示旧数据（单文件上传，未建批次）
+    if (!execOrLog(R"SQL(
+        CREATE TABLE IF NOT EXISTS uploads (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            resource_id INTEGER NOT NULL,
+            session_id  INTEGER,
+            created_at  TEXT    DEFAULT CURRENT_TIMESTAMP
+        );
+    )SQL", "create uploads")) return false;
+
+    // ---------- 5. 收藏表 ----------
+    // is_active: 1=已收藏 0=已取消(软删除)
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS favorites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
             resource_id INTEGER NOT NULL,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            is_active   INTEGER DEFAULT 1,
+            created_at  TEXT    DEFAULT CURRENT_TIMESTAMP,
+            updated_at  TEXT    DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, resource_id)
         );
     )SQL", "create favorites")) return false;
 
-    //常用查询的索引：提升 “我的上传/我的收藏” 的查询速度
-    if (!execOrLog(R"SQL(
-        CREATE INDEX IF NOT EXISTS idx_resources_uploader
-        ON resources(uploader_user_id);
-    )SQL", "create idx_resources_uploader")) return false;
-
-    if (!execOrLog(R"SQL(
-        CREATE INDEX IF NOT EXISTS idx_uploads_session
-        ON uploads(session_id);
-    )SQL", "create idx_uploads_session")) return false;
-
-    if (!execOrLog(R"SQL(
-        CREATE INDEX IF NOT EXISTS idx_uploads_user
-        ON uploads(user_id);
-    )SQL", "create idx_uploads_user")) return false;
-
-    if (!execOrLog(R"SQL(
-        CREATE INDEX IF NOT EXISTS idx_uploads_resource
-        ON uploads(resource_id);
-    )SQL", "create idx_uploads_resource")) return false;
-
-    if (!execOrLog(R"SQL(
-        CREATE INDEX IF NOT EXISTS idx_favorites_user
-        ON favorites(user_id);
-    )SQL", "create idx_favorites_user")) return false;
-
-    //comments：资源评论/留言
-    //- content 允许换行，直接存 TEXT
-    //- resource_name 先用“文件名”作为资源标识，后续如果 resources 表稳定维护，可迁移为 resource_id
+    // ---------- 6. 评论表 ----------
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS comments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            resource_name TEXT NOT NULL,
-            user_id INTEGER NOT NULL,
-            content TEXT NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            resource_name TEXT    NOT NULL,
+            user_id       INTEGER NOT NULL,
+            content       TEXT    NOT NULL,
+            created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
         );
     )SQL", "create comments")) return false;
-
-    // 常用查询索引：按资源名拉评论列表
-    if (!execOrLog(R"SQL(
-        CREATE INDEX IF NOT EXISTS idx_comments_resource
-        ON comments(resource_name);
-    )SQL", "create idx_comments_resource")) return false;
 
     return true;
 }

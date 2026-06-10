@@ -203,7 +203,41 @@
         </layout>
        </item>
        <item>
-        <widget class="QListWidget" name="listWidget"/>
+        <widget class="QTreeWidget" name="treeWidgetResources">
+         <property name="rootIsDecorated">
+          <bool>false</bool>
+         </property>
+         <property name="alternatingRowColors">
+          <bool>true</bool>
+         </property>
+         <property name="selectionMode">
+          <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+         </property>
+         <property name="columnCount">
+          <number>3</number>
+         </property>
+         <attribute name="headerDefaultSectionSize">
+          <number>200</number>
+         </attribute>
+         <attribute name="headerStretchLastSection">
+          <bool>true</bool>
+         </attribute>
+         <column>
+          <property name="text">
+           <string>资源名称</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>文件数</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>上传时间</string>
+          </property>
+         </column>
+        </widget>
        </item>
        <item>
         <widget class="QTextEdit" name="textEdit">

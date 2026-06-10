@@ -6,6 +6,7 @@
 #include <QMainWindow>
 #include <QTcpSocket>
 #include <QFile>
+#include <QTreeWidget>
 class FileClient;
 class TransferDialog;
 class MyUploadDialog;

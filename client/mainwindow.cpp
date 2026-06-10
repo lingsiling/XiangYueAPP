@@ -57,7 +57,7 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 
     // 接收服务端批次列表更新（新协议）
     connect(fileClient, &FileClient::sessionsUpdated, this, [=](const QVector<SessionDto> &sessions){
-        ui->listWidget->clear();
+        ui->treeWidgetResources->clear();
         for (const auto &s : sessions) {
             // ====== 列表展示逻辑 ======
             // s.description 格式："[批次名] 介绍文字" 或 "批次名"
@@ -74,17 +74,18 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
                 title = s.tags.isEmpty() ? "(无名称)" : s.tags;
             }
 
-            const QString text = QString("%1  ·  %2 个文件  ·  %3")
-                .arg(title)
-                .arg(s.fileCount)
-                .arg(s.createdAt);
-            auto *item = new QListWidgetItem(text);
-            // Qt::UserRole: 存 sessionId（用于请求文件列表）
-            item->setData(Qt::UserRole, s.id);
-            // Qt::UserRole+1: 存序列化数据 "sessionId|tags|description"（用于详情页标题）
-            item->setData(Qt::UserRole + 1,
+            // 3 列：资源名称 | 文件数 | 上传时间
+            auto *item = new QTreeWidgetItem();
+            item->setText(0, title);                                 // 列0：资源名称
+            item->setText(1, QString::number(s.fileCount));          // 列1：文件数
+            item->setText(2, s.createdAt);                           // 列2：上传时间
+
+            // 存储 sessionId 和序列化数据（双击时使用）
+            item->setData(0, Qt::UserRole, s.id);
+            item->setData(0, Qt::UserRole + 1,
                 QString("%1|%2|%3").arg(s.id).arg(s.tags).arg(s.description));
-            ui->listWidget->addItem(item);
+
+            ui->treeWidgetResources->addTopLevelItem(item);
         }
     });
 
@@ -120,8 +121,8 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     });
 
     // 双击列表项：打开资源详情页
-    connect(ui->listWidget, &QListWidget::itemDoubleClicked, this, [=](QListWidgetItem *item){
-        const QString data = item->data(Qt::UserRole + 1).toString();
+    connect(ui->treeWidgetResources, &QTreeWidget::itemDoubleClicked, this, [=](QTreeWidgetItem *item, int /*column*/){
+        const QString data = item->data(0, Qt::UserRole + 1).toString();
         if (data.isEmpty()) return;
 
         const QStringList parts = data.split('|');
@@ -145,11 +146,13 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 
 void MainWindow::refreshList(const QStringList &list)
 {
-    ui->listWidget->clear();
-    //过滤掉空字符串
-    for (const QString &item : list) {
-        if (!item.isEmpty()) {
-            ui->listWidget->addItem(item);
+    ui->treeWidgetResources->clear();
+    // 旧 LIST 兼容：每行显示文件名
+    for (const QString &fileName : list) {
+        if (!fileName.isEmpty()) {
+            auto *item = new QTreeWidgetItem();
+            item->setText(0, fileName);
+            ui->treeWidgetResources->addTopLevelItem(item);
         }
     }
 }
