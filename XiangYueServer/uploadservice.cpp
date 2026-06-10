@@ -93,6 +93,7 @@ UploadService::RecordResult UploadService::recordUploadedFile(const QString &fil
 UploadService::RecordBatchResult UploadService::recordBatchUploadedFiles(
     const QStringList &filePaths,
     qint64 userId,
+    const QString &bname,
     const QStringList &tags,
     const QString &desc)
 {
@@ -122,9 +123,13 @@ UploadService::RecordBatchResult UploadService::recordBatchUploadedFiles(
     q.prepare("INSERT INTO upload_sessions (user_id, tags, description, file_count)"
               " VALUES (?, ?, ?, ?)");
     q.addBindValue(userId);
-    q.addBindValue(tags.isEmpty() ? QString() : tags.join('|'));  // 用 '|' 拼接标签
-    q.addBindValue(desc.isEmpty() ? QString() : desc);
-    q.addBindValue(filePaths.size());                              // 本次上传文件数
+    q.addBindValue(tags.isEmpty() ? QString() : tags.join('|'));
+    // description 字段存入 "批次名|介绍" 格式，客户端可解析
+    const QString fullDesc = desc.isEmpty()
+        ? bname
+        : QString("%1|%2").arg(bname, desc);
+    q.addBindValue(fullDesc);
+    q.addBindValue(filePaths.size());
 
     if (!q.exec()) {
         db.rollback();                                            // 失败回滚

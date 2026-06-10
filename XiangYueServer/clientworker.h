@@ -108,12 +108,14 @@ private:
     qint64 m_uploadUserId;
     qint64 m_currentUserId;
 
-    // 批次上传状态：一次上传包含多个文件
+    // 批次上传状态
     QStringList m_batchFilePaths;       // 本批次已接收完成的文件绝对路径
-    QStringList m_batchTags;            // 本批次的标签列表（从客户端解析得到）
+    QStringList m_batchTags;            // 本批次的标签列表
+    QString m_batchName;                // 本批次的名称（用户自定义）
     QString m_batchDesc;                // 本批次的资源介绍
-    qint64 m_batchFileCount = 0;        // 客户端声明的文件总数（UPLOAD_BATCH 头中指定）
-    qint64 m_batchRecvCount = 0;        // 已接收完成的文件计数（到达 fileCount 时触发入库）
+    QString m_batchSubDir;              // 本批次文件的存储子目录（ServerSave/session_xxx/）
+    qint64 m_batchFileCount = 0;        // 客户端声明的文件总数
+    qint64 m_batchRecvCount = 0;        // 已接收完成的文件计数
 
     //路径配置
     QString m_saveDir;

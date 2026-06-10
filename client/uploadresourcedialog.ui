@@ -52,6 +52,24 @@
     </widget>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="horizontalLayoutBatchName">
+     <item>
+      <widget class="QLabel" name="labelBatchName">
+       <property name="text">
+        <string>批次名称：</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEditBatchName">
+       <property name="placeholderText">
+        <string>输入本次上传的名称</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="horizontalLayoutSelect">
      <item>
       <widget class="QPushButton" name="btnSelectFiles">

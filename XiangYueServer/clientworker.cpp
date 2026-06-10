@@ -6,10 +6,12 @@
 #include "taskqueue.h"
 #include "dbconnectionpool.h"
 #include "uploadservice.h"
+#include <QSqlQuery>
 #include <QTcpSocket>
 #include <QDebug>
 #include <QThread>
 #include <QDir>
+#include <QDateTime>
 
 ClientWorker::ClientWorker(qintptr socketDescriptor, QObject *parent)
     : QObject(parent),
@@ -178,15 +180,24 @@ void ClientWorker::tryProcessLines()
             m_uploadFileName = fromB64(p.value(2));
             m_uploadRecvSize = 0;
 
-            QDir().mkpath(m_saveDir);
-            const QString path = m_saveDir + m_uploadFileName;
+            // ====== 确定文件存储路径 ======
+            QString path;
+            if (!m_batchSubDir.isEmpty()) {
+                // 批次模式：存入子目录 ServerSave/user_x_timestamp/
+                path = m_saveDir + m_batchSubDir + "/" + m_uploadFileName;
+            } else {
+                // 单文件模式：直接存入 ServerSave/
+                QDir().mkpath(m_saveDir);
+                path = m_saveDir + m_uploadFileName;
+            }
             m_uploadFile.setFileName(path);
             if (!m_uploadFile.open(QIODevice::WriteOnly)) {
                 qDebug() << "[Worker] 无法打开文件:" << path;
                 m_isUploadIdle = true;
             } else {
                 qDebug() << "[Worker] 接收文件:" << m_uploadFileName
-                         << "大小=" << m_uploadFileSize;
+                         << "大小=" << m_uploadFileSize
+                         << "路径=" << path;
                 m_isUploadIdle = false;
                 return;
             }
@@ -250,7 +261,10 @@ void ClientWorker::consumeUploadData()
         m_uploadFile.close();
         m_isUploadIdle = true;
 
-        const QString path = m_saveDir + m_uploadFileName;
+        // 根据是否批次模式拼接正确的存盘路径
+        const QString path = m_batchSubDir.isEmpty()
+            ? (m_saveDir + m_uploadFileName)
+            : (m_saveDir + m_batchSubDir + "/" + m_uploadFileName);
 
         if (m_batchFileCount > 0) {
             // ============================================================
@@ -289,18 +303,53 @@ void ClientWorker::consumeUploadData()
 
 void ClientWorker::sendFileList()
 {
-    //快速操作，不需要异步处理
-    QDir dir(m_saveDir);
-    if (!dir.exists()) return;
+    // ====== 递归遍历 ServerSave 目录及其子目录，收集所有文件 ======
+    // 目录结构：
+    //   ServerSave/
+    //   ├── old_file.pdf                    （旧格式——单文件直接放在根目录）
+    //   ├── user_1/                         （用户1的目录）
+    //   │   ├── session_3/                  （第3次上传的文件）
+    //   │   │   ├── file1.pdf
+    //   │   │   └── file2.ppt
+    //   │   └── session_5/                  （第5次上传的文件）
+    //   │       └── report.docx
+    //   └── user_2/                         （用户2的目录）
+    //       └── session_1/
+    //           └── notes.txt
+    QStringList list;
 
-    QStringList list = dir.entryList(QDir::Files);
+    QStringList dirs;
+    dirs.append(m_saveDir);                     // 从根目录开始
+
+    while (!dirs.isEmpty()) {
+        const QString currentDir = dirs.takeFirst();
+        QDir dir(currentDir);
+        if (!dir.exists()) continue;
+
+        // 当前目录下的所有文件
+        const QStringList files = dir.entryList(QDir::Files);
+        for (const QString &f : files) {
+            // 文件路径相对于 ServerSave 根目录
+            const QString relativePath = QDir(m_saveDir).relativeFilePath(
+                currentDir + "/" + f);
+            list.append(relativePath);
+        }
+
+        // 递归子目录
+        const QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &sd : subDirs) {
+            dirs.append(currentDir + "/" + sd);
+        }
+    }
+
     const QString data = "LIST##" + list.join("##") + "\n";
     m_socket->write(data.toUtf8());
 }
 
 void ClientWorker::sendFile(const QString &fileName)
 {
-    //快速操作，不需要异步处理
+    // ====== 根据文件名查找文件（支持子目录） ======
+    // fileName 可能是 "file.pdf"（根目录）或 "session_1/file.pdf"（子目录）
     const QString path = m_saveDir + fileName;
     QFile f(path);
 
@@ -310,7 +359,9 @@ void ClientWorker::sendFile(const QString &fileName)
     }
 
     const qint64 size = f.size();
-    const QString head = QString("FILE##%1##%2\n").arg(fileName).arg(size);
+    // 只发送文件名（去掉路径前缀），客户端接收侧自己决定存哪里
+    const QString nameOnly = QFileInfo(fileName).fileName();
+    const QString head = QString("FILE##%1##%2\n").arg(nameOnly).arg(size);
     m_socket->write(head.toUtf8());
 
     while (!f.atEnd()) {
@@ -677,13 +728,23 @@ void ClientWorker::handleBatchUploadCommand(const QString &line)
     const qint64 uid = parts.value(2).toLongLong();
     m_uploadUserId = (uid > 0 ? uid : m_currentUserId);
 
-    m_batchTags = fromB64(parts.value(3)).split(',',
+    m_batchName = fromB64(parts.value(3));                     // 批次名（新字段）
+    m_batchTags = fromB64(parts.value(4)).split(',',
         Qt::SkipEmptyParts);                                   // 逗号分隔的标签
-    m_batchDesc = fromB64(parts.value(4));                     // 资源介绍
+    m_batchDesc = fromB64(parts.value(5));                      // 资源介绍
+
+    // ====== 创建本批次的存储子目录 ======
+    // 格式：ServerSave/user_<userId>/batch_<timestamp>/
+    // 入库后重命名为 ServerSave/user_<userId>/session_<id>/
+    m_batchSubDir = QString("user_%1/batch_%2")
+        .arg(m_uploadUserId)
+        .arg(QDateTime::currentMSecsSinceEpoch());
+    QDir().mkpath(m_saveDir + m_batchSubDir + "/");
 
     qDebug() << "[Worker] 批次上传开始:"
              << "文件数=" << m_batchFileCount
              << "userId=" << m_uploadUserId
+             << "子目录=" << m_batchSubDir
              << "标签=" << m_batchTags
              << "介绍=" << m_batchDesc;
 }
@@ -695,7 +756,28 @@ void ClientWorker::finalizeBatchUpload()
 
     UploadService service;
     auto res = service.recordBatchUploadedFiles(
-        m_batchFilePaths, m_uploadUserId, m_batchTags, m_batchDesc);
+        m_batchFilePaths, m_uploadUserId, m_batchName, m_batchTags, m_batchDesc);
+
+    // ====== 将临时批次子目录重命名为正式的 user_<userId>/session_<id> ======
+    if (res.ok && !m_batchSubDir.isEmpty()) {
+        const QString oldDir = m_saveDir + m_batchSubDir;
+        // 新目录：ServerSave/user_<userId>/session_<sessionId>/
+        const QString newDir = m_saveDir + QString("user_%1/session_%2")
+            .arg(m_uploadUserId).arg(res.sessionId);
+        QDir().mkpath(QFileInfo(newDir).absolutePath());  // 确保父目录存在
+        QDir().rename(oldDir, newDir);
+
+        // 更新数据库中的 server_path（从临时 batch_xxx 改为 session_<id>）
+        QSqlQuery q(DBConnectionPool::instance().connection());
+        q.prepare("UPDATE resources SET server_path = REPLACE(server_path, ?, ?)"
+                  " WHERE id IN (SELECT resource_id FROM uploads WHERE session_id = ?)");
+        q.addBindValue(m_batchSubDir);
+        q.addBindValue(QString("user_%1/session_%2").arg(m_uploadUserId).arg(res.sessionId));
+        q.addBindValue(res.sessionId);
+        q.exec();
+
+        qDebug() << "[Worker] 批次子目录重命名:" << oldDir << "→" << newDir;
+    }
 
     if (res.ok) {
         const QString ok = QString("BATCH_OK##%1\n").arg(res.sessionId);
@@ -712,6 +794,7 @@ void ClientWorker::finalizeBatchUpload()
     m_batchRecvCount = 0;
     m_batchTags.clear();
     m_batchDesc.clear();
+    m_batchSubDir.clear();
     m_uploadUserId = 0;
 }
 
@@ -720,7 +803,7 @@ void ClientWorker::finalizeSingleUpload(const QString &filePath)
 {
     UploadService service;
     auto res = service.recordBatchUploadedFiles(
-        {filePath}, m_uploadUserId, {}, {});
+        {filePath}, m_uploadUserId, m_batchName, {}, {});
 
     if (res.ok) {
         const QString ok = QString("BATCH_OK##%1\n").arg(res.sessionId);
@@ -731,6 +814,7 @@ void ClientWorker::finalizeSingleUpload(const QString &filePath)
     }
 
     sendFileList();
+    m_batchSubDir.clear();
     m_uploadUserId = 0;
 }
 
@@ -758,7 +842,7 @@ void ClientWorker::handleListSessionsCommand()
             .arg(s.id)
             .arg(s.userId)
             .arg(toB64(s.tags))
-            .arg(toB64(s.description))
+            .arg(toB64(s.description))        // description 中含批次名
             .arg(s.fileCount)
             .arg(toB64(s.createdAt));
         m_socket->write(item.toUtf8());

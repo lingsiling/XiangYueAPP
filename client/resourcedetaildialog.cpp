@@ -24,10 +24,16 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
 {
     ui->setupUi(this);
 
-    // 尝试解析为 sessionId（新批次协议）
-    bool ok = false;
-    m_sessionId = resourceName.toLongLong(&ok);
-    if (!ok) m_sessionId = 0;
+    // ====== 解析 resourceName 格式：sessionId|标题 ======
+    // 新协议通过 "sessionId|标题" 传递；旧协议纯字符串为资源名
+    const qint64 pipePos = resourceName.indexOf('|');
+    if (pipePos > 0) {
+        m_sessionId = resourceName.left(pipePos).toLongLong();
+        m_resourceName = resourceName.mid(pipePos + 1);   // 标题作为显示名
+    } else {
+        m_sessionId = resourceName.toLongLong();            // 纯数字？（旧协议）
+        if (m_sessionId > 0) m_resourceName = "资源详情";
+    }
 
     //加载样式表
     QFile file(":/qss/resourcedetaildialog_style.qss");

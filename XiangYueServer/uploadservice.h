@@ -40,6 +40,7 @@ public:
     // 批次上传：在事务内逐个写入文件记录 + 一条 upload_sessions 记录
     RecordBatchResult recordBatchUploadedFiles(const QStringList &filePaths,
                                                qint64 userId,
+                                               const QString &bname,
                                                const QStringList &tags,
                                                const QString &desc);
 

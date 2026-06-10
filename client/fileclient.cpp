@@ -607,6 +607,7 @@ void FileClient::handleMyUploadsEnd(const QByteArray &line)
 void FileClient::uploadBatch(const QStringList &filePaths,
                              qint64 userId,
                              const QStringList &tags,
+                             const QString &bname,
                              const QString &desc)
 {
     if (!tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState) {
@@ -619,9 +620,10 @@ void FileClient::uploadBatch(const QStringList &filePaths,
     // 格式：UPLOAD_BATCH##文件数##userId##标签(B64)##介绍(B64)
     // 服务端收到后会记录 m_batchFileCount，进入"批次上传模式"
     const QString tagsStr = tags.join(',');
-    const QString batchHead = QString("UPLOAD_BATCH##%1##%2##%3##%4\n")
+    const QString batchHead = QString("UPLOAD_BATCH##%1##%2##%3##%4##%5\n")
         .arg(filePaths.size())
         .arg(userId)
+        .arg(toB64(bname))          // 批次名（新增字段）
         .arg(toB64(tagsStr))       // Base64 编码避免中文/逗号破坏协议
         .arg(toB64(desc));         // Base64 编码避免换行/## 破坏协议
     tcpSocket->write(batchHead.toUtf8());

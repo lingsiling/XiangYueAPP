@@ -85,6 +85,7 @@ public:
     void uploadBatch(const QStringList &filePaths,
                      qint64 userId,
                      const QStringList &tags,
+                     const QString &bname,
                      const QString &desc);
 
     // ====== 新增：批次列表协议 ======

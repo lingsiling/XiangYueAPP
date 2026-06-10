@@ -126,11 +126,12 @@ void UploadResourceDialog::onSubmit()
         tags << ui->listWidgetTags->item(i)->text();
     }
 
+    const QString bname = ui->lineEditBatchName->text().trimmed();
     const QString desc = ui->textEditDescription->toPlainText().trimmed();
 
     // 调用 FileClient 的批次上传接口：一次上传多个文件 + 标签 + 介绍
     if (m_fileClient) {
-        m_fileClient->uploadBatch(filePaths, m_userId, tags, desc);
+        m_fileClient->uploadBatch(filePaths, m_userId, tags, bname, desc);
     }
 
     accept();

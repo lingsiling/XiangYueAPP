@@ -59,14 +59,31 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     connect(fileClient, &FileClient::sessionsUpdated, this, [=](const QVector<SessionDto> &sessions){
         ui->listWidget->clear();
         for (const auto &s : sessions) {
-            // 列表显示：标签  文件数  ·  时间
-            const QString tagsStr = s.tags.isEmpty() ? "(无标签)" : s.tags;
-            const QString text = QString("[%1]  %2 个文件  ·  %3")
-                .arg(tagsStr)
+            // ====== 列表展示逻辑 ======
+            // s.description 格式："[批次名] 介绍文字" 或 "批次名"
+            // 优先提取 [] 中的批次名作为标题显示，文件数和时间作为副标题
+            QString title;
+            if (s.description.startsWith('[')) {
+                const int closePos = s.description.indexOf(']');
+                title = (closePos > 0)
+                    ? s.description.mid(1, closePos - 1)              // 提取 [批次名]
+                    : s.description;
+            } else if (!s.description.isEmpty()) {
+                title = s.description;
+            } else {
+                title = s.tags.isEmpty() ? "(无名称)" : s.tags;
+            }
+
+            const QString text = QString("%1  ·  %2 个文件  ·  %3")
+                .arg(title)
                 .arg(s.fileCount)
                 .arg(s.createdAt);
             auto *item = new QListWidgetItem(text);
-            item->setData(Qt::UserRole, s.id);  // 存 sessionId
+            // Qt::UserRole: 存 sessionId（用于请求文件列表）
+            item->setData(Qt::UserRole, s.id);
+            // Qt::UserRole+1: 存序列化数据 "sessionId|tags|description"（用于详情页标题）
+            item->setData(Qt::UserRole + 1,
+                QString("%1|%2|%3").arg(s.id).arg(s.tags).arg(s.description));
             ui->listWidget->addItem(item);
         }
     });
@@ -102,17 +119,20 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         dlg.exec();
     });
 
-    // 双击列表项：根据列表类型打开详情页
+    // 双击列表项：打开资源详情页
     connect(ui->listWidget, &QListWidget::itemDoubleClicked, this, [=](QListWidgetItem *item){
-        const qint64 sessionId = item->data(Qt::UserRole).toLongLong();
+        const QString data = item->data(Qt::UserRole + 1).toString();
+        if (data.isEmpty()) return;
+
+        const QStringList parts = data.split('|');
+        const qint64 sessionId = parts.value(0).toLongLong();
+        const QString tags = parts.value(1);
+        const QString desc = parts.value(2);
+
         if (sessionId > 0) {
-            // 有 sessionId → 是批次列表，打开 ResourceDetailDialog 展示批次文件
-            ResourceDetailDialog dlg(this, QString::number(sessionId), fileClient, m_session.userId);
-            dlg.exec();
-        } else {
-            // 无 sessionId → 旧协议单文件
-            const QString resourceName = item->text();
-            ResourceDetailDialog dlg(this, resourceName, fileClient, m_session.userId);
+            // 通过 resourceName 传递 "sessionId|title"，构造时解析
+            const QString combine = QString("%1|%2").arg(sessionId).arg(desc);
+            ResourceDetailDialog dlg(this, combine, fileClient, m_session.userId);
             dlg.exec();
         }
     });
