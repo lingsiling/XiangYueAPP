@@ -16,10 +16,8 @@ MainWindow {
     );
 }
 
-/* ============================================
-   中心部件样式
-   ============================================ */
-MainWindow QWidget {
+/* 只让 QFrame 透明，不影响子对话框的 QMessageBox */
+MainWindow QFrame {
     background: transparent;
 }
 

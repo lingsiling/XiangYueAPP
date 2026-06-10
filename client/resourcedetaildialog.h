@@ -20,19 +20,26 @@ public:
 
     ~ResourceDetailDialog();
 
-private slots:
-    void on_buttonDownload_clicked();    // 已废弃（UI 中改名 buttonDownloadAll），保留避免 MOC 报错
+    // 保留空实现避免 MOC 自动连接报错"no matching signal"
+    // 实际下载由构造函数中 connect(buttonDownloadAll, ...) 处理
+    void on_buttonDownload_clicked() {}
     void on_buttonComment_clicked();
     void on_buttonFavorite_clicked();
+    void onDownloadSelected();            // "下载选中" 按钮：批量下载选中的文件
+    void onDownloadAll();                 // "下载全部" 按钮：下载列表所有文件
 
 private:
     Ui::ResourceDetailDialog *ui;
 
     QString m_resourceName;
-    qint64 m_sessionId = 0;   // 批次ID（新协议）；0 表示旧单文件模式
+    qint64 m_sessionId = 0;
     FileClient *m_fileClient = nullptr;
     qint64 m_userId = 0;
-    bool m_isFavorited = false; // 是否已收藏（用于切换按钮状态）
+    bool m_isFavorited = false;
+
+    // 下载计数（用于聚合多文件下载的提示）
+    int m_downloadPending = 0;     // 待下载文件数（发起下载时+1）
+    int m_downloadCompleted = 0;   // 已下载完成数（收到 downloadFinished 时+1） // 是否已收藏（用于切换按钮状态）
 };
 
 #endif // RESOURCEDETAILDIALOG_H

@@ -8,12 +8,19 @@ UploadResourceDialog {
     );
 }
 
-UploadResourceDialog QLabel {
+/* 标签：仅 Dialog 直系 QLabel，不影响子窗口 */
+UploadResourceDialog > QWidget > QWidget > QLabel,
+UploadResourceDialog > QWidget > QWidget > QWidget > QLabel {
     color: white;
     background: transparent;
 }
 
-UploadResourceDialog QPushButton {
+/* 按钮：仅 Dialog 布局内的按钮 */
+UploadResourceDialog QPushButton#btnSelectFiles,
+UploadResourceDialog QPushButton#btnClearFiles,
+UploadResourceDialog QPushButton#btnAddTag,
+UploadResourceDialog QPushButton#btnSubmit,
+UploadResourceDialog QPushButton#btnCancel {
     background: rgba(255, 255, 255, 0.15);
     color: white;
     border: none;
@@ -23,7 +30,11 @@ UploadResourceDialog QPushButton {
     outline: none;
 }
 
-UploadResourceDialog QPushButton:hover {
+UploadResourceDialog QPushButton#btnSelectFiles:hover,
+UploadResourceDialog QPushButton#btnClearFiles:hover,
+UploadResourceDialog QPushButton#btnAddTag:hover,
+UploadResourceDialog QPushButton#btnSubmit:hover,
+UploadResourceDialog QPushButton#btnCancel:hover {
     background: rgba(255, 255, 255, 0.25);
 }
 

@@ -19,23 +19,28 @@ ResourceDetailDialog {
 /* ============================================
    中心部件样式
    ============================================ */
-ResourceDetailDialog QWidget {
+/* 只让 QFrame 透明，不影响 QMessageBox 等弹窗 */
+ResourceDetailDialog QFrame {
     background: transparent;
 }
 
-/* ============================================
-   标签样式（标题、文本信息）
-   ============================================ */
-ResourceDetailDialog QLabel {
+/* 标题标签（单独指定，不影响 QMessageBox） */
+ResourceDetailDialog QLabel#labelSessionTitle,
+ResourceDetailDialog QLabel#labelTags,
+ResourceDetailDialog QLabel#labelUploader,
+ResourceDetailDialog QLabel#labelUploadTime,
+ResourceDetailDialog QLabel#labelDescTitle,
+ResourceDetailDialog QLabel#labelFilesTitle,
+ResourceDetailDialog QLabel#labelCommentsTitle {
     color: white;
     font-size: 12px;
     background: transparent;
 }
 
-/* ============================================
-   下载/评论按钮样式
-   ============================================ */
-ResourceDetailDialog QPushButton {
+/* 按钮：仅具体命名的按钮 */
+ResourceDetailDialog QPushButton#buttonDownloadAll,
+ResourceDetailDialog QPushButton#buttonFavorite,
+ResourceDetailDialog QPushButton#buttonComment {
     background: qlineargradient(
         x1:0, y1:0, x2:1, y2:1,
         stop:0 #FFD89B,
@@ -50,7 +55,9 @@ ResourceDetailDialog QPushButton {
     outline: none;
 }
 
-ResourceDetailDialog QPushButton:hover {
+ResourceDetailDialog QPushButton#buttonDownloadAll:hover,
+ResourceDetailDialog QPushButton#buttonFavorite:hover,
+ResourceDetailDialog QPushButton#buttonComment:hover {
     background: qlineargradient(
         x1:0, y1:0, x2:1, y2:1,
         stop:0 #FFE5B4,
@@ -58,7 +65,9 @@ ResourceDetailDialog QPushButton:hover {
     );
 }
 
-ResourceDetailDialog QPushButton:pressed {
+ResourceDetailDialog QPushButton#buttonDownloadAll:pressed,
+ResourceDetailDialog QPushButton#buttonFavorite:pressed,
+ResourceDetailDialog QPushButton#buttonComment:pressed {
     background: qlineargradient(
         x1:0, y1:0, x2:1, y2:1,
         stop:0 #FFC466,

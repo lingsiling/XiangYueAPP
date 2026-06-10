@@ -259,9 +259,9 @@ void FileClient::consumeDownloadData()
         //发出下载完成信号
         emit downloadFinished();
 
-        //头像文件不弹提示（避免干扰用户）
-        if (!fileName.startsWith("avatar_"))
-            QMessageBox::information(mainWindow, "完成", "下载完成");
+        // 不弹窗：由 UI 层（ResourceDetailDialog）负责聚合多文件下载的提示
+        // if (!fileName.startsWith("avatar_"))
+        //     QMessageBox::information(mainWindow, "完成", "下载完成");
     }
 }
 

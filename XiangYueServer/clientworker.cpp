@@ -348,18 +348,48 @@ void ClientWorker::sendFileList()
 
 void ClientWorker::sendFile(const QString &fileName)
 {
-    // ====== 根据文件名查找文件（支持子目录） ======
-    // fileName 可能是 "file.pdf"（根目录）或 "session_1/file.pdf"（子目录）
-    const QString path = m_saveDir + fileName;
-    QFile f(path);
+    // ====== 在 ServerSave 及子目录中递归查找文件 ======
+    // 目录结构：ServerSave/user_<id>/session_<id>/file.pdf
+    QString foundPath;
+    QStringList dirs;
+    dirs.append(m_saveDir);
 
+    while (!dirs.isEmpty()) {
+        const QString currentDir = dirs.takeFirst();
+        QDir dir(currentDir);
+        if (!dir.exists()) continue;
+
+        // 检查当前目录中的文件
+        const QFileInfoList files = dir.entryInfoList(QDir::Files);
+        for (const QFileInfo &fi : files) {
+            if (fi.fileName() == fileName) {
+                foundPath = fi.absoluteFilePath();
+                break;
+            }
+        }
+        if (!foundPath.isEmpty()) break;
+
+        // 递归子目录
+        const QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &sd : subDirs) {
+            dirs.append(currentDir + "/" + sd);
+        }
+    }
+
+    if (foundPath.isEmpty()) {
+        qDebug() << "[Worker] 下载失败：文件不存在" << fileName;
+        m_socket->write("FILE_FAIL##FILE_NOT_FOUND\n");
+        return;
+    }
+
+    QFile f(foundPath);
     if (!f.open(QIODevice::ReadOnly)) {
-        qDebug() << "[Worker] 无法打开下载文件:" << path;
+        qDebug() << "[Worker] 无法打开下载文件:" << foundPath;
+        m_socket->write("FILE_FAIL##OPEN_FAIL\n");
         return;
     }
 
     const qint64 size = f.size();
-    // 只发送文件名（去掉路径前缀），客户端接收侧自己决定存哪里
     const QString nameOnly = QFileInfo(fileName).fileName();
     const QString head = QString("FILE##%1##%2\n").arg(nameOnly).arg(size);
     m_socket->write(head.toUtf8());
@@ -369,6 +399,7 @@ void ClientWorker::sendFile(const QString &fileName)
     }
 
     f.close();
+    qDebug() << "[Worker] 文件已发送:" << nameOnly << "(" << size << "字节)";
 }
 
 void ClientWorker::handleListCommand()

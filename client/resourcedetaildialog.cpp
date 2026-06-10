@@ -45,6 +45,20 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     ui->labelSessionTitle->setText(m_resourceName);
     ui->buttonFavorite->setText("收藏");
 
+    // ====== 下载计数逻辑：多文件下载只弹一次提示 ======
+    connect(m_fileClient, &FileClient::downloadFinished, this, [=]() {
+        ++m_downloadCompleted;
+        if (m_downloadPending > 0 && m_downloadCompleted >= m_downloadPending) {
+            QMessageBox::information(this, "下载完成",
+                QString("全部 %1 个文件下载完成").arg(m_downloadPending));
+            m_downloadPending = 0;
+            m_downloadCompleted = 0;
+        }
+    });
+
+    // ====== "下载全部" 按钮绑定 ======
+    connect(ui->buttonDownloadAll, &QPushButton::clicked, this, &ResourceDetailDialog::onDownloadAll);
+
     if (!m_fileClient) return;
 
     // ====== 新协议：按 sessionId 加载批次文件 ======
@@ -56,18 +70,31 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
                 if (sid != m_sessionId) return;
                 ui->treeWidgetFiles->clear();
                 for (const auto &f : files) {
+                    // ====== 2 列：文件名 | 大小 ======
                     auto *item = new QTreeWidgetItem();
-                    item->setText(0, f.filename);
-                    item->setText(1, QString::number(f.size));
-                    item->setText(2, f.uploadedAt);
+                    item->setText(0, f.filename);                 // 列0：文件名
+                    item->setText(1, QString::number(f.size));    // 列1：文件大小
+                    // 将文件信息存入 Qt::UserRole 供下载使用
+                    item->setData(0, Qt::UserRole, f.filename);
+                    item->setData(1, Qt::UserRole, f.id);         // resource id（预留）
                     ui->treeWidgetFiles->addTopLevelItem(item);
                 }
             });
         // 请求该批次的文件列表
         m_fileClient->requestSessionFiles(m_sessionId);
-        // 请求该批次的文件列表
-        m_fileClient->requestSessionFiles(m_sessionId);
     }
+
+    // ====== 双击列表行触发单文件下载 ======
+    connect(ui->treeWidgetFiles, &QTreeWidget::itemDoubleClicked, this,
+        [=](QTreeWidgetItem *item, int /*column*/)
+        {
+            const QString fileName = item->data(0, Qt::UserRole).toString();
+            if (fileName.isEmpty()) return;
+            // 设置计数为1（单文件下载）
+            m_downloadPending = 1;
+            m_downloadCompleted = 0;
+            m_fileClient->downloadFile(fileName);
+        });
 
     //UI 只监听 FileClient 的信号，不关心协议/数据库
     connect(m_fileClient, &FileClient::commentsUpdated, this,
@@ -234,19 +261,52 @@ void ResourceDetailDialog::on_buttonFavorite_clicked()
         QMessageBox::warning(this, "错误", "未登录，无法收藏");
         return;
     }
-
-    // 根据当前收藏状态，调用相应的函数
     if (m_isFavorited) {
-        // 已收藏，点击取消收藏
         m_fileClient->removeFavorite(m_resourceName);
     } else {
-        // 未收藏，点击收藏
         m_fileClient->addFavorite(m_resourceName);
     }
 }
 
-// 已废弃：UI 中 buttonDownload 改名为 buttonDownloadAll
-// 保留空实现避免 MOC 生成的代码链接报错
-void ResourceDetailDialog::on_buttonDownload_clicked()
+// ====== "下载选中" 按钮：遍历选中的行，逐个下载 ======
+void ResourceDetailDialog::onDownloadSelected()
 {
+    QList<QTreeWidgetItem *> selected = ui->treeWidgetFiles->selectedItems();
+    if (selected.isEmpty()) {
+        QMessageBox::information(this, "提示", "请先在列表中选择要下载的文件");
+        return;
+    }
+
+    if (!m_fileClient) return;
+
+    // ====== 设置下载计数：选中文件全部完成后才弹窗 ======
+    m_downloadPending = selected.size();
+    m_downloadCompleted = 0;
+
+    for (QTreeWidgetItem *item : selected) {
+        const QString fileName = item->data(0, Qt::UserRole).toString();
+        if (!fileName.isEmpty()) {
+            m_fileClient->downloadFile(fileName);
+        }
+    }
+}
+
+// ====== "下载全部" 按钮：遍历所有行，逐个下载 ======
+void ResourceDetailDialog::onDownloadAll()
+{
+    const int count = ui->treeWidgetFiles->topLevelItemCount();
+    if (count == 0) return;
+    if (!m_fileClient) return;
+
+    // ====== 设置下载计数：全部文件完成后才弹窗 ======
+    m_downloadPending = count;
+    m_downloadCompleted = 0;
+
+    for (int i = 0; i < count; ++i) {
+        QTreeWidgetItem *item = ui->treeWidgetFiles->topLevelItem(i);
+        const QString fileName = item->data(0, Qt::UserRole).toString();
+        if (!fileName.isEmpty()) {
+            m_fileClient->downloadFile(fileName);
+        }
+    }
 }
