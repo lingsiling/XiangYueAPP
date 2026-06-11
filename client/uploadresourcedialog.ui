@@ -82,6 +82,9 @@
        <property name="text">
         <string>选择文件</string>
        </property>
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -94,6 +97,9 @@
        </property>
        <property name="text">
         <string>清除选中</string>
+       </property>
+       <property name="autoDefault">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
@@ -273,8 +279,8 @@
        <property name="text">
         <string>上传</string>
        </property>
-       <property name="default">
-        <bool>true</bool>
+       <property name="autoDefault">
+        <bool>false</bool>
        </property>
       </widget>
      </item>

@@ -36,7 +36,7 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 
     fileClient = new FileClient(tcpSocket, this);
 
-    // 改为请求批次列表（替代旧 LIST）
+    //请求批次列表
     fileClient->requestAllSessions();
 
     //连接 fileReceived 更新 QLabel（只处理头像文件名）
@@ -116,9 +116,9 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 
         if (sessionId > 0) {
             // resourceName 传 title（批次名），详情页标题显示批次名
-            // tags 直接通过构造函数参数传入，不再用 setProperty
+            // tags 和 desc 直接通过构造函数参数传入
             const QString combine = QString("%1|%2").arg(sessionId).arg(title);
-            ResourceDetailDialog dlg(this, combine, fileClient, m_session.userId, tags);
+            ResourceDetailDialog dlg(this, combine, fileClient, m_session.userId, tags, desc);
             dlg.exec();
         }
     });

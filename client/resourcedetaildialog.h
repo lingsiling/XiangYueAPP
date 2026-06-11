@@ -17,7 +17,8 @@ public:
                                   const QString &resourceName = QString(),
                                   FileClient *fileClient = nullptr,
                                   qint64 userId = 0,
-                                  const QString &tags = QString());
+                                  const QString &tags = QString(),
+                                  const QString &desc = QString());
 
     ~ResourceDetailDialog();
 

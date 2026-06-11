@@ -13,7 +13,8 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
                                            const QString &resourceName,
                                            FileClient *fileClient,
                                            qint64 userId,
-                                           const QString &tags)
+                                           const QString &tags,
+                                           const QString &desc)
     : QDialog(parent),
     ui(new Ui::ResourceDetailDialog),
     m_resourceName(resourceName),
@@ -24,15 +25,11 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
 {
     ui->setupUi(this);
 
-    // ====== 解析 resourceName 格式：sessionId|标题 ======
-    // 新协议通过 "sessionId|标题" 传递；旧协议纯字符串为资源名
+    // ====== 解析 "sessionId|标题" 格式获取批次ID和展示标题 ======
     const qint64 pipePos = resourceName.indexOf('|');
     if (pipePos > 0) {
-        m_sessionId = resourceName.left(pipePos).toLongLong();
-        m_resourceName = resourceName.mid(pipePos + 1);   // 标题作为显示名
-    } else {
-        m_sessionId = resourceName.toLongLong();            // 纯数字？（旧协议）
-        if (m_sessionId > 0) m_resourceName = "资源详情";
+        m_sessionId   = resourceName.left(pipePos).toLongLong(); // 批次ID
+        m_resourceName = resourceName.mid(pipePos + 1);          // 标题文本
     }
 
     //加载样式表
@@ -44,6 +41,15 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
 
     ui->labelBatchTitle->setText(m_resourceName);
     ui->buttonFavorite->setText("收藏");
+
+    // ====== 资源描述显示 ======
+    // desc 由 MainWindow 从 item->data 的 "sessionId||title||tags||desc" 中解析后传入
+    // 描述可为空，空时显示占位文字
+    if (!desc.isEmpty()) {
+        ui->textEditDesc->setPlainText(desc);
+    } else {
+        ui->textEditDesc->setPlaceholderText("（暂无描述）");
+    }
 
     // ====== 标签展示：用 QListWidget 实现每个 tag 独立背景色块 ======
     // 与上传资源详情界面的 listWidgetTags 保持一致的视觉效果
