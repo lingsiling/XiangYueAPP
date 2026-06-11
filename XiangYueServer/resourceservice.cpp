@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDebug>
+#include <algorithm>
 
 ResourceService::SyncResult ResourceService::syncDirectory(const QString &saveDir,
                                                            std::optional<qint64> uploaderUserId)
@@ -19,17 +20,41 @@ ResourceService::SyncResult ResourceService::syncDirectory(const QString &saveDi
         return r;
     }
 
-    const QFileInfoList files = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
-    for (const QFileInfo &info : files) {
-        //逐个文件同步，保证历史文件也能入库
-        if (m_repo.upsert(info.fileName(), info.absoluteFilePath(), info.size(), uploaderUserId))
-            ++r.touchedCount;
+    // ====== 递归遍历 ServerSave 所有子目录下的文件 ======
+    // 目录结构：ServerSave/user_<userId>/session_<id>/file.pdf
+    QStringList allFilePaths;
+    QStringList dirs;
+    dirs.append(saveDir);
+
+    while (!dirs.isEmpty()) {
+        const QString curDir = dirs.takeFirst();
+        QDir d(curDir);
+        if (!d.exists()) continue;
+
+        const QFileInfoList fileList = d.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+        for (const QFileInfo &info : fileList) {
+            // 只用文件名做主键，子目录下的同名文件会被覆盖（符合 upsert 语义）
+            if (m_repo.upsert(info.fileName(), info.absoluteFilePath(),
+                              info.size(), uploaderUserId))
+                ++r.touchedCount;
+            allFilePaths.append(info.absoluteFilePath());
+        }
+
+        // 递归子目录
+        const QStringList subDirs = d.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &sd : subDirs) {
+            dirs.append(curDir + "/" + sd);
+        }
     }
 
-    //数据库里有、磁盘上没有的旧记录，直接清理掉，避免脏数据残留
+    // 数据库里有、磁盘上没有的旧记录，直接清理掉，避免脏数据残留
     const QList<ResourceRecord> records = m_repo.listAll();
     for (const ResourceRecord &record : records) {
-        if (!dir.exists(record.filename)) {
+        const bool existsOnDisk = std::any_of(allFilePaths.begin(), allFilePaths.end(),
+            [&](const QString &p) {
+                return p.endsWith("/" + record.filename);
+            });
+        if (!existsOnDisk) {
             if (m_repo.deleteByFileName(record.filename))
                 ++r.removedCount;
         }
@@ -164,4 +189,9 @@ ResourceService::ListByUploaderResult ResourceService::listByUploader(qint64 upl
     r.items = m_repo.listByUploader(uploaderUserId);
     r.ok = true;
     return r;
+}
+
+bool ResourceService::updateResourceServerPath(const QString &oldSubDir, const QString &newSubDir, qint64 sessionId)
+{
+    return m_repo.updateServerPath(oldSubDir, newSubDir, sessionId);
 }

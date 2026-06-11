@@ -32,8 +32,8 @@ LogDialog::LogDialog(QWidget *parent)
 
     tcpSocket = new QTcpSocket(this);
 
-    //一打开登陆界面就连接服务器
-    tcpSocket->connectToHost("127.0.0.1",7777);
+    // 打开登录界面即连接服务器
+    tcpSocket->connectToHost("127.0.0.1", 7777);
 
     // 连接成功
     connect(tcpSocket, &QTcpSocket::connected, this, [=]() {

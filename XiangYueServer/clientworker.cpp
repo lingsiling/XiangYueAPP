@@ -85,18 +85,21 @@ void ClientWorker::onReadyRead()
 {
     m_buf += m_socket->readAll();
 
-    //上传中：优先当二进制消费
-    if (!m_isUploadIdle) {
-        consumeUploadData();
+    // 循环处理：当一批 TCP 包中含多个文件时，处理完一个继续下一个
+    while (!m_buf.isEmpty()) {
+        if (!m_isUploadIdle) {
+            consumeUploadData();
+        }
+
+        // 仍在接收文件二进制，等下次 readyRead
         if (!m_isUploadIdle) return;
-    }
 
-    //空闲状态：按行解析命令
-    tryProcessLines();
-
-    //可能刚解析到上传头，缓冲区里已经粘了文件内容
-    if (!m_isUploadIdle) {
-        consumeUploadData();
+        // 空闲就继续解析命令（可能是下个 FILE## 头）
+        if (m_buf.contains('\n')) {
+            tryProcessLines();
+        } else {
+            break;  // 没有完整行，等更多数据
+        }
     }
 }
 
@@ -126,15 +129,12 @@ void ClientWorker::tryProcessLines()
 
         const QString line = QString::fromUtf8(raw).trimmed();
 
-        if (line == "LIST") {
-            handleListCommand();
-        }
-        else if (line == "LIST_SESSIONS") {
-            // 新：返回所有批次列表（替代旧 LIST）
+        if (line == "LIST_SESSIONS") {
+            //返回所有批次列表
             handleListSessionsCommand();
         }
         else if (line.startsWith("SESSION_FILES##")) {
-            // 新：返回某批次的文件列表
+            //返回某批次的文件列表
             handleSessionFilesCommand(line);
         }
         else if (line.startsWith("DOWNLOAD##")) {
@@ -151,56 +151,9 @@ void ClientWorker::tryProcessLines()
             // 批次上传模式入口：记录文件总数、标签、介绍，后续 FILE## 头跟随
             handleBatchUploadCommand(line);
         }
-        else if (line.startsWith("UPLOAD##")) {
-            // 旧单文件上传（向后兼容）：UPLOAD##fileName##fileSize##userId
-            QStringList p = line.split("##");
-            m_uploadFileName = p.value(1).trimmed();
-            m_uploadFileSize = p.value(2).toLongLong();
-            const qint64 headerUserId = p.value(3).toLongLong();
-            m_uploadUserId = (headerUserId > 0 ? headerUserId : m_currentUserId);
-            m_uploadRecvSize = 0;
-
-            QDir().mkpath(m_saveDir);
-            const QString path = m_saveDir + m_uploadFileName;
-            m_uploadFile.setFileName(path);
-            if (!m_uploadFile.open(QIODevice::WriteOnly)) {
-                qDebug() << "[Worker] 无法打开文件:" << path;
-                m_isUploadIdle = true;
-            } else {
-                qDebug() << "[Worker] 接收旧格式文件:" << m_uploadFileName
-                         << "大小=" << m_uploadFileSize;
-                m_isUploadIdle = false;
-                return;
-            }
-        }
         else if (line.startsWith("FILE##")) {
-            // 新格式单文件上传 / 批次内的文件：FILE##size##fileName(B64)
-            QStringList p = line.split("##");
-            m_uploadFileSize = p.value(1).toLongLong();
-            m_uploadFileName = fromB64(p.value(2));
-            m_uploadRecvSize = 0;
-
-            // ====== 确定文件存储路径 ======
-            QString path;
-            if (!m_batchSubDir.isEmpty()) {
-                // 批次模式：存入子目录 ServerSave/user_x_timestamp/
-                path = m_saveDir + m_batchSubDir + "/" + m_uploadFileName;
-            } else {
-                // 单文件模式：直接存入 ServerSave/
-                QDir().mkpath(m_saveDir);
-                path = m_saveDir + m_uploadFileName;
-            }
-            m_uploadFile.setFileName(path);
-            if (!m_uploadFile.open(QIODevice::WriteOnly)) {
-                qDebug() << "[Worker] 无法打开文件:" << path;
-                m_isUploadIdle = true;
-            } else {
-                qDebug() << "[Worker] 接收文件:" << m_uploadFileName
-                         << "大小=" << m_uploadFileSize
-                         << "路径=" << path;
-                m_isUploadIdle = false;
-                return;
-            }
+            startReceivingFile(line);
+            if (!m_isUploadIdle) return; // 进入上传模式，退出 while 让 consumeUploadData 处理
         }
         // ============================================================
         //  注册 / 登录 / 头像 / 评论 / 收藏 等异步命令
@@ -256,49 +209,25 @@ void ClientWorker::consumeUploadData()
     m_uploadRecvSize += len;
     m_buf.remove(0, canWrite);
 
-    // 文件接收完成：根据是否在批次模式内决定走单文件入库还是批次累积
-    if (m_uploadRecvSize >= m_uploadFileSize) {
-        m_uploadFile.close();
-        m_isUploadIdle = true;
+    if (m_uploadRecvSize < m_uploadFileSize) return;
 
-        // 根据是否批次模式拼接正确的存盘路径
-        const QString path = m_batchSubDir.isEmpty()
-            ? (m_saveDir + m_uploadFileName)
-            : (m_saveDir + m_batchSubDir + "/" + m_uploadFileName);
+    // ====== 文件接收完成 ======
+    m_uploadFile.close();
+    m_isUploadIdle = true;
 
-        if (m_batchFileCount > 0) {
-            // ============================================================
-            //  批次模式：累积文件路径，等全部文件收完再统一入库
-            //  这样可以保证整个批次的文件在一个事务中写入数据库，
-            //  配合 upload_sessions 表实现"一次上传"的语义
-            // ============================================================
-            m_batchFilePaths.append(path);
-            m_batchRecvCount++;
+    m_batchFilePaths.append(m_saveDir + m_batchSubDir + "/" + m_uploadFileName);
+    m_batchRecvCount++;
 
-            qDebug() << "[Worker] 批次文件接收完成:" << m_uploadFileName
-                     << "(" << m_batchRecvCount << "/" << m_batchFileCount << ")";
+    qDebug() << "[Worker] 批次文件:" << m_uploadFileName
+             << "(" << m_batchRecvCount << "/" << m_batchFileCount << ")";
 
-            if (m_batchRecvCount >= m_batchFileCount) {
-                // 全部文件已收完 → 事务入库 + 回复客户端
-                finalizeBatchUpload();
-            }
-        } else {
-            // ============================================================
-            //  单文件模式：没有 UPLOAD_BATCH 头，直接入库
-            //  也走 UploadService 的批次接口，让 session 只包含一个文件，
-            //  保持数据库逻辑统一（都走 upload_sessions 表）
-            // ============================================================
-            finalizeSingleUpload(path);
-        }
-
-        // 无论单文件还是批次，上传状态都要重置
-        m_uploadFileName.clear();
-        m_uploadFileSize = 0;
-        m_uploadRecvSize = 0;
-        if (m_batchFileCount <= 0) {
-            m_uploadUserId = 0;
-        }
+    if (m_batchRecvCount >= m_batchFileCount) {
+        finalizeBatchUpload();
     }
+
+    m_uploadFileName.clear();
+    m_uploadFileSize = 0;
+    m_uploadRecvSize = 0;
 }
 
 void ClientWorker::sendFileList()
@@ -759,7 +688,7 @@ void ClientWorker::handleBatchUploadCommand(const QString &line)
     const qint64 uid = parts.value(2).toLongLong();
     m_uploadUserId = (uid > 0 ? uid : m_currentUserId);
 
-    m_batchName = fromB64(parts.value(3));                     // 批次名（新字段）
+    m_batchName = fromB64(parts.value(3));                     // 批次名
     m_batchTags = fromB64(parts.value(4)).split(',',
         Qt::SkipEmptyParts);                                   // 逗号分隔的标签
     m_batchDesc = fromB64(parts.value(5));                      // 资源介绍
@@ -793,19 +722,15 @@ void ClientWorker::finalizeBatchUpload()
     if (res.ok && !m_batchSubDir.isEmpty()) {
         const QString oldDir = m_saveDir + m_batchSubDir;
         // 新目录：ServerSave/user_<userId>/session_<sessionId>/
-        const QString newDir = m_saveDir + QString("user_%1/session_%2")
+        const QString newSubDir = QString("user_%1/session_%2")
             .arg(m_uploadUserId).arg(res.sessionId);
+        const QString newDir = m_saveDir + newSubDir;
         QDir().mkpath(QFileInfo(newDir).absolutePath());  // 确保父目录存在
         QDir().rename(oldDir, newDir);
 
-        // 更新数据库中的 server_path（从临时 batch_xxx 改为 session_<id>）
-        QSqlQuery q(DBConnectionPool::instance().connection());
-        q.prepare("UPDATE resources SET server_path = REPLACE(server_path, ?, ?)"
-                  " WHERE id IN (SELECT resource_id FROM uploads WHERE session_id = ?)");
-        q.addBindValue(m_batchSubDir);
-        q.addBindValue(QString("user_%1/session_%2").arg(m_uploadUserId).arg(res.sessionId));
-        q.addBindValue(res.sessionId);
-        q.exec();
+        // 通过 Service 更新资源路径（不直接操作 SQL）
+        ResourceService resourceService;
+        resourceService.updateResourceServerPath(m_batchSubDir, newSubDir, res.sessionId);
 
         qDebug() << "[Worker] 批次子目录重命名:" << oldDir << "→" << newDir;
     }
@@ -860,8 +785,8 @@ void ClientWorker::onTaskError(const QString &taskType, const QString &error)
 //           SESSIONS_END
 void ClientWorker::handleListSessionsCommand()
 {
-    UploadRepository repo;
-    const auto sessions = repo.listAllSessions();
+    UploadService uploadService;
+    const auto sessions = uploadService.listAllSessions();
 
     // 发送批次总数
     const QString begin = QString("SESSIONS_BEGIN##%1\n").arg(sessions.size());
@@ -869,11 +794,12 @@ void ClientWorker::handleListSessionsCommand()
 
     // 逐条发送每个批次的元信息
     for (const auto &s : sessions) {
-        const QString item = QString("SESSION_ITEM##%1##%2##%3##%4##%5##%6\n")
+        const QString item = QString("SESSION_ITEM##%1##%2##%3##%4##%5##%6##%7\n")
             .arg(s.id)
             .arg(s.userId)
+            .arg(toB64(s.title))          // 批次名
             .arg(toB64(s.tags))
-            .arg(toB64(s.description))        // description 中含批次名
+            .arg(toB64(s.description))    // 资源介绍
             .arg(s.fileCount)
             .arg(toB64(s.createdAt));
         m_socket->write(item.toUtf8());
@@ -892,12 +818,21 @@ void ClientWorker::handleSessionFilesCommand(const QString &line)
     const qint64 sid = line.section("##", 1, 1).toLongLong();
     if (sid <= 0) return;
 
-    UploadRepository repo;
-    const auto files = repo.listBySessionId(sid);
+    UploadService uploadService;
+    const auto files = uploadService.listSessionFiles(sid);
 
+    // 通过 service 查询上传者名称
+    const QString uploaderName = uploadService.uploaderNameForSession(sid);
+
+    // 发送批次总数 + 上传者名
     const QString begin = QString("SESSION_FILES_BEGIN##%1##%2\n")
         .arg(sid).arg(files.size());
     m_socket->write(begin.toUtf8());
+
+    // 发送上传者名称
+    if (!uploaderName.isEmpty()) {
+        m_socket->write(QString("UPLOADER##%1\n").arg(toB64(uploaderName)).toUtf8());
+    }
 
     for (const auto &f : files) {
         const QString item = QString("FILE_ITEM##%1##%2##%3##%4\n")
@@ -920,6 +855,30 @@ QString ClientWorker::toB64(const QString &s)
 QString ClientWorker::fromB64(const QString &b64)
 {
     return QString::fromUtf8(QByteArray::fromBase64(b64.toUtf8()));
+}
+
+// ====== 解析文件上传头：FILE##size##fileName(B64) ======
+// 所有上传都走这条路径
+void ClientWorker::startReceivingFile(const QString &line)
+{
+    QStringList p = line.split("##");
+    m_uploadFileSize = p.value(1).toLongLong();       // 文件大小
+    m_uploadFileName = fromB64(p.value(2));           // Base64 解码文件名
+    m_uploadRecvSize = 0;
+
+    // 存入批次子目录
+    const QString path = m_saveDir + m_batchSubDir + "/" + m_uploadFileName;
+    m_uploadFile.setFileName(path);
+    if (!m_uploadFile.open(QIODevice::WriteOnly)) {
+        qDebug() << "[Worker] 无法打开文件:" << path;
+        m_isUploadIdle = true;
+    } else {
+        qDebug() << "[Worker] 接收文件:" << m_uploadFileName
+                 << "大小=" << m_uploadFileSize
+                 << "路径=" << path;
+        m_isUploadIdle = false;
+        return;   // 退出 tryProcessLines，后续由 consumeUploadData 消费二进制
+    }
 }
 
 void ClientWorker::sendResponse(const QString &response)

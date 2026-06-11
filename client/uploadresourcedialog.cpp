@@ -10,7 +10,9 @@
 
 #include <locale>
 
-// 格式化文件大小为可读字符串
+// ============================================================
+//  工具函数：将字节数格式化为可读字符串（如 "2.3 MB"）
+// ============================================================
 static QString formatFileSize(qint64 bytes)
 {
     if (bytes < 1024)
@@ -25,26 +27,28 @@ static QString formatFileSize(qint64 bytes)
 UploadResourceDialog::UploadResourceDialog(FileClient *fileClient, qint64 userId, QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::UploadResourceDialog)
-    , m_fileClient(fileClient)
-    , m_userId(userId)
+    , m_fileClient(fileClient)   // 网络通信模块（由 MainWindow 注入，不负责生命周期）
+    , m_userId(userId)           // 当前登录用户ID
 {
     ui->setupUi(this);
 
-    // 加载 QSS 样式表
+    // 让 QDialog 能渲染 QSS 背景渐变（关键：否则黑色）
+    setAttribute(Qt::WA_StyledBackground, true);
+
+    // 加载 QSS 样式表（从 Qt 资源文件）
     QFile qssFile(":/qss/uploadresourcedialog_style.qss");
     if (qssFile.open(QFile::ReadOnly)) {
         setStyleSheet(QLatin1String(qssFile.readAll()));
         qssFile.close();
-        qDebug() << "UploadResourceDialog 样式表加载成功";
     }
-    // ---------- 信号连接 ----------
+    // ====== 信号-槽绑定：UI 控件 → 业务逻辑 ======
     connect(ui->btnSelectFiles,  &QPushButton::clicked, this, &UploadResourceDialog::onSelectFiles);
     connect(ui->btnClearFiles,   &QPushButton::clicked, this, &UploadResourceDialog::onClearFiles);
     connect(ui->btnAddTag,       &QPushButton::clicked, this, &UploadResourceDialog::onAddTag);
     connect(ui->btnSubmit,       &QPushButton::clicked, this, &UploadResourceDialog::onSubmit);
     connect(ui->btnCancel,       &QPushButton::clicked, this, &QDialog::reject);
 
-    // 回车也可添加标签
+    // 输入标签后按回车也能添加（不用鼠标点按钮）
     connect(ui->lineEditTag, &QLineEdit::returnPressed, this, &UploadResourceDialog::onAddTag);
 
     // 树形列表选择变化时更新统计
@@ -63,7 +67,10 @@ UploadResourceDialog::~UploadResourceDialog()
     delete ui;
 }
 
-// ---------- 选择文件（多选）----------
+// ============================================================
+//  "选择文件"按钮：弹出系统文件对话框，支持多选
+//  选中后逐个添加到 treeWidgetFiles（自动去重）
+// ============================================================
 void UploadResourceDialog::onSelectFiles()
 {
     const QStringList paths = QFileDialog::getOpenFileNames(this, "选择要上传的文件");
@@ -77,7 +84,9 @@ void UploadResourceDialog::onSelectFiles()
     ui->labelFileStats->setText(QString("已选 0 个文件（共 %1 个）").arg(count));
 }
 
-// ---------- 清除选中 ----------
+// ============================================================
+//  "清除选中"按钮：删除 treeWidgetFiles 中当前选中的行
+// ============================================================
 void UploadResourceDialog::onClearFiles()
 {
     QList<QTreeWidgetItem *> sel = ui->treeWidgetFiles->selectedItems();
@@ -89,7 +98,10 @@ void UploadResourceDialog::onClearFiles()
     ui->labelFileStats->setText(QString("已选 0 个文件（共 %1 个）").arg(count));
 }
 
-// ---------- 添加标签 ----------
+// ============================================================
+//  "添加标签"按钮 / 回车键：
+//  将 lineEditTag 内容加入 listWidgetTags，自动去重
+// ============================================================
 void UploadResourceDialog::onAddTag()
 {
     const QString tag = ui->lineEditTag->text().trimmed();
@@ -105,9 +117,34 @@ void UploadResourceDialog::onAddTag()
     ui->lineEditTag->clear();
 }
 
-// ---------- 添加上传 ----------
+// ============================================================
+//  "上传"按钮：收集所有用户输入，调用 FileClient 发起批次上传
+//
+//  收集内容：
+//    - filePaths：treeWidgetFiles 每行的 Qt::UserRole（绝对路径）
+//    - tags：     listWidgetTags 每个 item 的文字
+//    - desc：     textEditDescription 的文本
+//
+//  调用链路：
+//    onSubmit() → FileClient::uploadBatch() → 发送 UPLOAD_BATCH 协议
+// ============================================================
 void UploadResourceDialog::onSubmit()
 {
+    // ====== 资源名称必填校验 ======
+    const QString bname = ui->lineEditBatchName->text().trimmed();
+    if (bname.isEmpty()) {
+        QMessageBox::warning(this, "提示", "请输入资源名称");
+        ui->lineEditBatchName->setFocus();
+        return;
+    }
+
+    // ====== 标签必填校验 ======
+    if (ui->listWidgetTags->count() == 0) {
+        QMessageBox::warning(this, "提示", "请至少添加一个标签");
+        ui->lineEditTag->setFocus();
+        return;
+    }
+
     // 收集文件路径
     QStringList filePaths;
     for (int i = 0; i < ui->treeWidgetFiles->topLevelItemCount(); ++i) {
@@ -115,6 +152,7 @@ void UploadResourceDialog::onSubmit()
         filePaths << it->data(0, Qt::UserRole).toString();
     }
 
+    // ====== 文件必须选择 ======
     if (filePaths.isEmpty()) {
         QMessageBox::warning(this, "提示", "请先选择至少一个文件");
         return;
@@ -126,10 +164,9 @@ void UploadResourceDialog::onSubmit()
         tags << ui->listWidgetTags->item(i)->text();
     }
 
-    const QString bname = ui->lineEditBatchName->text().trimmed();
     const QString desc = ui->textEditDescription->toPlainText().trimmed();
 
-    // 调用 FileClient 的批次上传接口：一次上传多个文件 + 标签 + 介绍
+    // 调用 FileClient 的批次上传接口
     if (m_fileClient) {
         m_fileClient->uploadBatch(filePaths, m_userId, tags, bname, desc);
     }
@@ -137,7 +174,12 @@ void UploadResourceDialog::onSubmit()
     accept();
 }
 
-// ---------- 向 treeWidget 添加一行 ----------
+// ============================================================
+//  向 treeWidgetFiles 添加一行文件信息
+//  列结构：文件名 | 大小 | 类型
+//  将绝对路径存在 Qt::UserRole 中，供 onSubmit 读取
+//  自动去重（相同绝对路径不重复添加）
+// ============================================================
 void UploadResourceDialog::addFileRow(const QString &path)
 {
     QFileInfo fi(path);

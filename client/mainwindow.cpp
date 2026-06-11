@@ -59,31 +59,16 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     connect(fileClient, &FileClient::sessionsUpdated, this, [=](const QVector<SessionDto> &sessions){
         ui->treeWidgetResources->clear();
         for (const auto &s : sessions) {
-            // ====== 列表展示逻辑 ======
-            // s.description 格式："[批次名] 介绍文字" 或 "批次名"
-            // 优先提取 [] 中的批次名作为标题显示，文件数和时间作为副标题
-            QString title;
-            if (s.description.startsWith('[')) {
-                const int closePos = s.description.indexOf(']');
-                title = (closePos > 0)
-                    ? s.description.mid(1, closePos - 1)              // 提取 [批次名]
-                    : s.description;
-            } else if (!s.description.isEmpty()) {
-                title = s.description;
-            } else {
-                title = s.tags.isEmpty() ? "(无名称)" : s.tags;
-            }
-
-            // 3 列：资源名称 | 文件数 | 上传时间
             auto *item = new QTreeWidgetItem();
-            item->setText(0, title);                                 // 列0：资源名称
-            item->setText(1, QString::number(s.fileCount));          // 列1：文件数
-            item->setText(2, s.createdAt);                           // 列2：上传时间
+            item->setText(0, s.title.isEmpty() ? "(无名称)" : s.title);
 
-            // 存储 sessionId 和序列化数据（双击时使用）
+            item->setText(1, QString::number(s.fileCount));
+            item->setText(2, s.createdAt);
+
             item->setData(0, Qt::UserRole, s.id);
+            // 用 "||" 作为字段分隔符（避免与 tags 内部 "|" 冲突）
             item->setData(0, Qt::UserRole + 1,
-                QString("%1|%2|%3").arg(s.id).arg(s.tags).arg(s.description));
+                QString("%1||%2||%3||%4").arg(s.id).arg(s.title).arg(s.tags).arg(s.description));
 
             ui->treeWidgetResources->addTopLevelItem(item);
         }
@@ -125,15 +110,18 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         const QString data = item->data(0, Qt::UserRole + 1).toString();
         if (data.isEmpty()) return;
 
-        const QStringList parts = data.split('|');
+        // 用 "||" 分隔（sessionId||title||tags||desc），避免与 tags 内部的 "|" 冲突
+        const QStringList parts = data.split("||");
         const qint64 sessionId = parts.value(0).toLongLong();
-        const QString tags = parts.value(1);
-        const QString desc = parts.value(2);
+        const QString title = parts.value(1);
+        const QString tags  = parts.value(2);
+        const QString desc  = parts.value(3);
 
         if (sessionId > 0) {
-            // 通过 resourceName 传递 "sessionId|title"，构造时解析
-            const QString combine = QString("%1|%2").arg(sessionId).arg(desc);
-            ResourceDetailDialog dlg(this, combine, fileClient, m_session.userId);
+            // resourceName 传 title（批次名），详情页标题显示批次名
+            // tags 直接通过构造函数参数传入，不再用 setProperty
+            const QString combine = QString("%1|%2").arg(sessionId).arg(title);
+            ResourceDetailDialog dlg(this, combine, fileClient, m_session.userId, tags);
             dlg.exec();
         }
     });

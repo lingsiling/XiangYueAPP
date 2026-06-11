@@ -72,7 +72,7 @@ bool UploadRepository::deleteByResourceId(qint64 resourceId)
 	if (resourceId <= 0)
 		return false;
 
-	//资源删除时同步清理 uploads，避免“我的上传”里残留脏记录
+    //资源删除时同步清理 uploads，避免“我的上传”里残留记录
 	QSqlQuery q(DBConnectionPool::instance().connection());
 	q.prepare("DELETE FROM uploads WHERE resource_id = ?");
 	q.addBindValue(resourceId);
@@ -119,6 +119,26 @@ QList<ResourceRecord> UploadRepository::listBySessionId(qint64 sessionId)
     return list;
 }
 
+QString UploadRepository::uploaderNameBySessionId(qint64 sessionId)
+{
+    if (sessionId <= 0) return {};
+
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare("SELECT user_id FROM upload_sessions WHERE id = ?");
+    q.addBindValue(sessionId);
+    if (!q.exec() || !q.next()) return {};
+
+    const qint64 userId = q.value(0).toLongLong();
+
+    QSqlQuery q2(DBConnectionPool::instance().connection());
+    q2.prepare("SELECT username FROM users WHERE id = ?");
+    q2.addBindValue(userId);
+    if (q2.exec() && q2.next()) {
+        return q2.value(0).toString();
+    }
+    return {};
+}
+
 // ====== 查询所有批次列表（主界面展示用） ======
 QList<UploadRepository::SessionRow> UploadRepository::listAllSessions()
 {
@@ -126,7 +146,7 @@ QList<UploadRepository::SessionRow> UploadRepository::listAllSessions()
 
     QSqlQuery q(DBConnectionPool::instance().connection());
     q.prepare(R"SQL(
-        SELECT id, user_id, tags, description, file_count, created_at
+        SELECT id, user_id, title, tags, description, file_count, created_at
         FROM upload_sessions ORDER BY created_at DESC
     )SQL");
 
@@ -139,10 +159,11 @@ QList<UploadRepository::SessionRow> UploadRepository::listAllSessions()
         SessionRow row;
         row.id = q.value(0).toLongLong();
         row.userId = q.value(1).toLongLong();
-        row.tags = q.value(2).toString();
-        row.description = q.value(3).toString();
-        row.fileCount = q.value(4).toInt();
-        row.createdAt = q.value(5).toString();
+        row.title = q.value(2).toString();
+        row.tags = q.value(3).toString();
+        row.description = q.value(4).toString();
+        row.fileCount = q.value(5).toInt();
+        row.createdAt = q.value(6).toString();
         list.append(row);
     }
     return list;

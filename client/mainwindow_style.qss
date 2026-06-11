@@ -60,7 +60,8 @@ MainWindow QLabel#username {
 MainWindow QPushButton#buttonFavorite,
 MainWindow QPushButton#buttonMyUpload,
 MainWindow QPushButton#buttonUpload,
-MainWindow QPushButton#buttonSet {
+MainWindow QPushButton#buttonSet,
+MainWindow QPushButton#buttonBackToMain {
     background: rgba(255, 255, 255, 0.15);
     color: white;
     border: none;
@@ -75,7 +76,8 @@ MainWindow QPushButton#buttonSet {
 MainWindow QPushButton#buttonFavorite:hover,
 MainWindow QPushButton#buttonMyUpload:hover,
 MainWindow QPushButton#buttonUpload:hover,
-MainWindow QPushButton#buttonSet:hover {
+MainWindow QPushButton#buttonSet:hover,
+MainWindow QPushButton#buttonBackToMain:hover {
     background: rgba(255, 255, 255, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
@@ -83,7 +85,8 @@ MainWindow QPushButton#buttonSet:hover {
 MainWindow QPushButton#buttonFavorite:pressed,
 MainWindow QPushButton#buttonMyUpload:pressed,
 MainWindow QPushButton#buttonUpload:pressed,
-MainWindow QPushButton#buttonSet:pressed {
+MainWindow QPushButton#buttonSet:pressed,
+MainWindow QPushButton#buttonBackToMain:pressed {
     background: rgba(255, 255, 255, 0.35);
 }
 

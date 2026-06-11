@@ -48,7 +48,8 @@ public:
 
     //查询某个用户上传过的资源列表：用于“我的上传”页面
     ListByUploaderResult listByUploader(qint64 uploaderUserId);
-
+    // 更新资源路径子目录（批次重命名 batch_xxx → session_<id>）
+    bool updateResourceServerPath(const QString &oldSubDir, const QString &newSubDir, qint64 sessionId);
 private:
     ResourceRepository m_repo;
 };

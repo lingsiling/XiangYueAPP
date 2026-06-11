@@ -99,9 +99,22 @@ UploadService::RecordBatchResult UploadService::recordBatchUploadedFiles(
 {
     RecordBatchResult r;
 
-    // 参数校验：userId 必须有效，文件列表不能为空
+    // ====== 参数校验 ======
     if (userId <= 0 || filePaths.isEmpty()) {
         r.reason = "INVALID_PARAM";
+        return r;
+    }
+    if (bname.trimmed().isEmpty()) {
+        r.reason = "RESOURCE_NAME_EMPTY";       // 资源名称必填
+        return r;
+    }
+    if (bname.length() > 100) {
+        r.reason = "RESOURCE_NAME_TOO_LONG";    // 名称过长（数据库友好）
+        return r;
+    }
+    // 标签至少一个
+    if (tags.isEmpty()) {
+        r.reason = "TAG_EMPTY";                 // 标签必填
         return r;
     }
 
@@ -120,16 +133,13 @@ UploadService::RecordBatchResult UploadService::recordBatchUploadedFiles(
 
     // ====== 第1步：创建 upload_sessions 记录（这一条代表"一次上传"） ======
     QSqlQuery q(db);
-    q.prepare("INSERT INTO upload_sessions (user_id, tags, description, file_count)"
-              " VALUES (?, ?, ?, ?)");
+    q.prepare("INSERT INTO upload_sessions (user_id, title, tags, description, file_count)"
+              " VALUES (?, ?, ?, ?, ?)");
     q.addBindValue(userId);
-    q.addBindValue(tags.isEmpty() ? QString() : tags.join('|'));
-    // description 字段存入 "批次名|介绍" 格式，客户端可解析
-    const QString fullDesc = desc.isEmpty()
-        ? bname
-        : QString("%1|%2").arg(bname, desc);
-    q.addBindValue(fullDesc);
-    q.addBindValue(filePaths.size());
+    q.addBindValue(bname.isEmpty() ? QString() : bname);           // 批次名（新列）
+    q.addBindValue(tags.isEmpty() ? QString() : tags.join('|'));   // 标签
+    q.addBindValue(desc.isEmpty() ? QString() : desc);             // 资源介绍
+    q.addBindValue(filePaths.size());                               // 文件数
 
     if (!q.exec()) {
         db.rollback();                                            // 失败回滚
@@ -193,4 +203,22 @@ UploadService::RecordBatchResult UploadService::recordBatchUploadedFiles(
     r.ok = true;
     r.sessionId = sessionId;     // 返回批次ID给调用方（ClientWorker 用于回复 BATCH_OK##sessionId）
     return r;
+}
+
+// ====== 查询：列出所有批次（委托给 UploadRepository） ======
+QList<UploadRepository::SessionRow> UploadService::listAllSessions()
+{
+    return m_repo.listAllSessions();
+}
+
+// ====== 查询：列出某个批次的文件 ======
+QList<ResourceRecord> UploadService::listSessionFiles(qint64 sessionId)
+{
+    return m_repo.listBySessionId(sessionId);
+}
+
+// ====== 查询：获取批次上传者用户名 ======
+QString UploadService::uploaderNameForSession(qint64 sessionId)
+{
+    return m_repo.uploaderNameBySessionId(sessionId);
 }

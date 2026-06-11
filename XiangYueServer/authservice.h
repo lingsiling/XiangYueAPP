@@ -29,6 +29,9 @@ public:
     RegisterResult registerUser(const QString &username, const QString &password);
     LoginResult login(const QString &username, const QString &password);
 
+    // 按用户ID查询用户信息（代替 ClientWorker 直接调 UserRepository）
+    std::optional<UserRecord> findUserById(qint64 userId);
+
 private:
     UserRepository m_repo;
 };

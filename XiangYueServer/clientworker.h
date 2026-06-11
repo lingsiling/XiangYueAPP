@@ -53,8 +53,8 @@ private:
     //命令解析（网络IO线程执行，快速返回）
     void tryProcessLines();
 
-    //上传处理
-    void consumeUploadData();
+    void consumeUploadData();        // 接收文件二进制数据
+    void startReceivingFile(const QString &line);  // 解析文件上传头
     void sendFileList();
     void sendFile(const QString &fileName);
 

@@ -16,7 +16,8 @@ public:
     explicit ResourceDetailDialog(QWidget *parent = nullptr,
                                   const QString &resourceName = QString(),
                                   FileClient *fileClient = nullptr,
-                                  qint64 userId = 0);
+                                  qint64 userId = 0,
+                                  const QString &tags = QString());
 
     ~ResourceDetailDialog();
 

@@ -47,8 +47,9 @@ struct SessionDto
 {
     qint64 id = 0;
     qint64 userId = 0;
+    QString title;          // 批次名
     QString tags;
-    QString description;
+    QString description;    // 资源介绍
     int fileCount = 0;
     QString createdAt;
 };
@@ -206,7 +207,8 @@ signals:
 
     // 某批次文件列表（ResourceDetailDialog 展示用）
     void sessionFilesUpdated(qint64 sessionId, const QVector<ResourceDto> &files);
-
+    // 上传者名称收到（ResourceDetailDialog 展示用）
+    void uploaderReceived(const QString &name);
     //评论列表拉取完成（一次性返回，UI 刷新更简单）
     void commentsUpdated(const QString &resourceName, const QVector<CommentDto> &comments);
 

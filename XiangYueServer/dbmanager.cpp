@@ -134,6 +134,11 @@ bool DBManager::initSchema()
         );
     )SQL", "create upload_sessions")) return false;
 
+    // 批次名 title 列（兼容旧表，尝试添加，失败不阻塞）
+    QSqlQuery titleQ(m_db);
+    titleQ.exec("ALTER TABLE upload_sessions ADD COLUMN title TEXT DEFAULT ''");
+    // 忽略"列已存在"错误，SQLite 不支持 IF NOT EXISTS
+
     // ---------- 4. 上传记录表 ----------
     // 记录每个文件属于哪个批次
     // session_id 为 NULL 表示旧数据（单文件上传，未建批次）

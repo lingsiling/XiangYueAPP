@@ -44,6 +44,15 @@ public:
                                                const QStringList &tags,
                                                const QString &desc);
 
+    // 查询：列出所有批次
+    QList<UploadRepository::SessionRow> listAllSessions();
+
+    // 查询：列出某个批次的文件
+    QList<ResourceRecord> listSessionFiles(qint64 sessionId);
+
+    // 查询：获取批次上传者用户名
+    QString uploaderNameForSession(qint64 sessionId);
+
 private:
     ResourceRepository m_resourceRepo;
     UploadRepository m_repo;

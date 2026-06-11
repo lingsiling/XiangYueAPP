@@ -59,27 +59,6 @@ void FileClient::tryProcessLines()
             //进入下载状态后就退出，让 onReadyRead() 去消费二进制内容
             if(!isDownloadStart) return;
         }
-        else if(line.startsWith("UPLOAD_OK##"))
-        {
-            // UPLOAD_OK##fileName
-            QString fn = QString::fromUtf8(line).section("##", 1, 1).trimmed();
-
-            emit logLine(QString("上传完成：%1").arg(fn));
-
-            //发出上传完成信号
-            emit uploadFinished();
-
-            //收到服务端确认后再刷新
-            requestList();
-
-            //多文件上传调度点
-            //当前文件已完成：关闭当前上传文件并启动下一个任务
-            if (m_uploadFile.isOpen())
-                m_uploadFile.close();
-
-            m_isUploading = false;
-            startNextUpload();
-        }
         else if (line.startsWith("BATCH_OK##"))
         {
             // ============================================================
@@ -98,7 +77,13 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit logLine(QString("批次上传失败: %1").arg(reason));
         }
-        else if (line.startsWith("COMMENT_BEGIN##"))
+        // 接收上传者信息：UPLOADER##name(B64)
+    else if (line.startsWith("UPLOADER##"))
+    {
+        const QString name = fromB64(QString::fromUtf8(line).section("##", 1).trimmed());
+        emit uploaderReceived(name);
+    }
+    else if (line.startsWith("COMMENT_BEGIN##"))
         {
             handleCommentBegin(line);
         }
@@ -266,105 +251,10 @@ void FileClient::consumeDownloadData()
 }
 
 //单文件上传：保持兼容（内部直接转到多文件上传）
-void FileClient::uploadFile(QString filePath)
-{
-    uploadFiles(QStringList{filePath});
-}
 
 //多文件上传：把任务加入队列并启动
-void FileClient::uploadFiles(const QStringList &filePaths)
-{
-    int added = 0;
-    //低FileClient 只关心“路径能否打开/大小”，不关心 UI 选择逻辑
-    for (const QString &p : filePaths)
-    {
-        const QString path = p.trimmed();
-        if (path.isEmpty()) continue;
-
-        QFileInfo info(path);
-        if (!info.exists() || !info.isFile()) {
-            emit logLine(QString("跳过：不存在或不是文件：%1").arg(path));
-            continue;
-        }
-
-        UploadTask t;
-        t.path = path;
-        t.name = info.fileName();
-        t.size = info.size();
-
-        //简单过滤：空文件不能上传（也可以让服务端拒绝，但这里提前过滤掉，避免浪费上传时间）
-        if (t.size < 0) {
-            emit logLine(QString("跳过：文件大小异常：%1").arg(path));
-            continue;
-        }
-
-        m_uploadQueue.enqueue(t);
-        added++;
-    }
-
-    if (added > 0)
-        emit logLine(QString("已加入上传队列：%1 个文件").arg(added));
-
-    //如果当前没有在上传，则立即启动队列
-    if (!m_isUploading)
-        startNextUpload();
-}
 
 //启动队列中的下一个文件上传（一次只上传一个）
-void FileClient::startNextUpload()
-{
-    if (m_isUploading) return;
-    if (!tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        emit logLine("上传失败：未连接服务器");
-        return;
-    }
-
-    if (m_uploadQueue.isEmpty()) {
-        emit logLine("上传队列已完成");
-        return;
-    }
-
-    UploadTask t = m_uploadQueue.dequeue();
-
-    m_uploadFile.setFileName(t.path);
-    if (!m_uploadFile.open(QIODevice::ReadOnly))
-    {
-        //打不开：跳过，继续下一个
-        emit logLine(QString("跳过：无法打开文件：%1").arg(t.path));
-        m_isUploading = false;
-        startNextUpload();
-        return;
-    }
-
-    //先发头（必须带 '\n'，让服务端进入上传状态）
-    //协议升级：UPLOAD##fileName##fileSize##userId
-    const qint64 userId = (mainWindow ? mainWindow->currentUserId() : 0);
-    const QString head = QString("UPLOAD##%1##%2##%3\n").arg(t.name).arg(t.size).arg(userId);
-    tcpSocket->write(head.toUtf8());
-
-    //按块发送文件，每块发送后更新进度
-    qint64 sentSize = 0;
-    const qint64 chunkSize = 4096;  // 每块 4KB
-
-    //再发二进制
-    while(!m_uploadFile.atEnd())
-    {
-        QByteArray chunk = m_uploadFile.read(chunkSize);
-        if (chunk.isEmpty()) break;
-
-        tcpSocket->write(chunk);
-        sentSize += chunk.size();
-
-        //发出上传进度信号
-        if (t.size > 0) {
-            int percentage = (int)((sentSize * 100) / t.size);
-            emit uploadProgress(t.name, sentSize, t.size, percentage);
-        }
-    }
-    //这里不立刻 close 文件、不立刻刷新 LIST；
-    //必须等待服务端 UPLOAD_OK 再认为上传完成（避免网络缓冲导致“客户端认为发完了但服务端还没写完”）
-    m_isUploading = true;
-}
 
 //向服务端发送请求列表
 void FileClient::requestList()
@@ -623,7 +513,7 @@ void FileClient::uploadBatch(const QStringList &filePaths,
     const QString batchHead = QString("UPLOAD_BATCH##%1##%2##%3##%4##%5\n")
         .arg(filePaths.size())
         .arg(userId)
-        .arg(toB64(bname))          // 批次名（新增字段）
+        .arg(toB64(bname))         // 批次名
         .arg(toB64(tagsStr))       // Base64 编码避免中文/逗号破坏协议
         .arg(toB64(desc));         // Base64 编码避免换行/## 破坏协议
     tcpSocket->write(batchHead.toUtf8());
@@ -694,15 +584,16 @@ void FileClient::handleSessionsBegin(const QByteArray & /*line*/)
 
 void FileClient::handleSessionItem(const QByteArray &line)
 {
-    // SESSION_ITEM##id##userId##tags(B64)##desc(B64)##fileCount##createdAt(B64)
+    // 格式：SESSION_ITEM##id##userId##title(B64)##tags(B64)##desc(B64)##fileCount##createdAt(B64)
     const QString s = QString::fromUtf8(line);
     SessionDto dto;
     dto.id = s.section("##", 1, 1).toLongLong();
     dto.userId = s.section("##", 2, 2).toLongLong();
-    dto.tags = fromB64(s.section("##", 3, 3));
-    dto.description = fromB64(s.section("##", 4, 4));
-    dto.fileCount = s.section("##", 5, 5).toInt();
-    dto.createdAt = fromB64(s.section("##", 6, 6));
+    dto.title = fromB64(s.section("##", 3, 3));
+    dto.tags = fromB64(s.section("##", 4, 4));
+    dto.description = fromB64(s.section("##", 5, 5));
+    dto.fileCount = s.section("##", 6, 6).toInt();
+    dto.createdAt = fromB64(s.section("##", 7, 7));
     m_pendingSessions.append(dto);
 }
 

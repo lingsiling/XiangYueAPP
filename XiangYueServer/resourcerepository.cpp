@@ -70,10 +70,26 @@ QList<ResourceRecord> ResourceRepository::listAll()
     return out;
 }
 
-bool ResourceRepository::upsert(const QString &filename,
-                                const QString &serverPath,
-                                qint64 size,
-                                std::optional<qint64> uploaderUserId)
+bool ResourceRepository::updateServerPath(const QString &oldSubDir, const QString &newSubDir, qint64 sessionId)
+{
+    if (oldSubDir.isEmpty() || newSubDir.isEmpty() || sessionId <= 0) return false;
+
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare("UPDATE resources SET server_path = REPLACE(server_path, ?, ?)"
+              " WHERE id IN (SELECT resource_id FROM uploads WHERE session_id = ?)");
+    q.addBindValue(oldSubDir);
+    q.addBindValue(newSubDir);
+    q.addBindValue(sessionId);
+
+    if (!q.exec()) {
+        qDebug() << "[ResourceRepo] updateServerPath failed:" << q.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool ResourceRepository::upsert(const QString &filename, const QString &serverPath,
+                                 qint64 size, std::optional<qint64> uploaderUserId)
 {
     //同名文件按“更新”处理，避免重复上传后表里出现旧路径或旧大小
     const QString name = filename.trimmed();

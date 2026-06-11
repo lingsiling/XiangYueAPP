@@ -35,20 +35,18 @@
    <property name="bottomMargin">
     <number>16</number>
    </property>
-
-   <!-- ===== 标题行：批次名 + 下载按钮 ===== -->
    <item>
     <layout class="QHBoxLayout" name="horizontalLayoutHeader">
      <item>
-      <widget class="QLabel" name="labelSessionTitle">
+      <widget class="QLabel" name="labelBatchTitle">
        <property name="font">
         <font>
-         <pointsize>16</pointsize>
+         <pointsize>24</pointsize>
          <bold>true</bold>
         </font>
        </property>
        <property name="text">
-        <string>资源详情</string>
+        <string>资源批次名称</string>
        </property>
       </widget>
      </item>
@@ -93,8 +91,6 @@
      </item>
     </layout>
    </item>
-
-   <!-- ===== 批次元信息 ===== -->
    <item>
     <layout class="QHBoxLayout" name="horizontalLayoutMeta">
      <item>
@@ -133,8 +129,6 @@
      </item>
     </layout>
    </item>
-
-   <!-- ===== 资源介绍 ===== -->
    <item>
     <widget class="QLabel" name="labelDescTitle">
      <property name="text">
@@ -144,9 +138,6 @@
    </item>
    <item>
     <widget class="QTextEdit" name="textEditDesc">
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
      <property name="minimumSize">
       <size>
        <width>0</width>
@@ -159,13 +150,14 @@
        <height>60</height>
       </size>
      </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
      <property name="placeholderText">
       <string>（无介绍）</string>
      </property>
     </widget>
    </item>
-
-   <!-- ===== 文件列表（本次上传的全部文件） ===== -->
    <item>
     <widget class="QLabel" name="labelFilesTitle">
      <property name="text">
@@ -208,8 +200,6 @@
      </column>
     </widget>
    </item>
-
-   <!-- ===== 评论区 ===== -->
    <item>
     <widget class="QLabel" name="labelCommentsTitle">
      <property name="text">

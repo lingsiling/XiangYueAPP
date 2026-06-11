@@ -13,7 +13,8 @@ static constexpr int ROLE_OWNER_UID  = Qt::UserRole + 1;
 ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
                                            const QString &resourceName,
                                            FileClient *fileClient,
-                                           qint64 userId)
+                                           qint64 userId,
+                                           const QString &tags)
     : QDialog(parent),
     ui(new Ui::ResourceDetailDialog),
     m_resourceName(resourceName),
@@ -42,8 +43,16 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
         file.close();
     }
 
-    ui->labelSessionTitle->setText(m_resourceName);
+    ui->labelBatchTitle->setText(m_resourceName);
     ui->buttonFavorite->setText("收藏");
+
+    // ====== 显示标签（直接通过构造函数参数传入，不再用 setProperty） ======
+    if (!tags.isEmpty()) {
+        ui->labelTags->setText(QString("标签：%1")
+            .arg(QString(tags).replace('|', " | ")));
+    } else {
+        ui->labelTags->setText(QString("标签：暂无"));
+    }
 
     // ====== 下载计数逻辑：多文件下载只弹一次提示 ======
     connect(m_fileClient, &FileClient::downloadFinished, this, [=]() {
@@ -63,21 +72,33 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
 
     // ====== 新协议：按 sessionId 加载批次文件 ======
     if (m_sessionId > 0) {
+        // 监听上传者名称
+        connect(m_fileClient, &FileClient::uploaderReceived, this,
+            [=](const QString &name) {
+                if (!name.isEmpty()) {
+                    ui->labelUploader->setText(QString("上传者：%1").arg(name));
+                }
+            });
         // 监听批次文件列表返回
         connect(m_fileClient, &FileClient::sessionFilesUpdated, this,
             [=](qint64 sid, const QVector<ResourceDto> &files)
             {
                 if (sid != m_sessionId) return;
                 ui->treeWidgetFiles->clear();
+
+                // ====== 填充文件列表（2 列：文件名 | 大小） ======
                 for (const auto &f : files) {
-                    // ====== 2 列：文件名 | 大小 ======
                     auto *item = new QTreeWidgetItem();
                     item->setText(0, f.filename);                 // 列0：文件名
                     item->setText(1, QString::number(f.size));    // 列1：文件大小
-                    // 将文件信息存入 Qt::UserRole 供下载使用
-                    item->setData(0, Qt::UserRole, f.filename);
-                    item->setData(1, Qt::UserRole, f.id);         // resource id（预留）
+                    item->setData(0, Qt::UserRole, f.filename);   // 存文件名给下载用
                     ui->treeWidgetFiles->addTopLevelItem(item);
+                }
+
+                // ====== 显示上传时间（取第一个文件的上传时间） ======
+                if (!files.isEmpty() && !files.first().uploadedAt.isEmpty()) {
+                    ui->labelUploadTime->setText(
+                        QString("上传时间：%1").arg(files.first().uploadedAt));
                 }
             });
         // 请求该批次的文件列表
@@ -95,68 +116,6 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
             m_downloadCompleted = 0;
             m_fileClient->downloadFile(fileName);
         });
-
-    //UI 只监听 FileClient 的信号，不关心协议/数据库
-    connect(m_fileClient, &FileClient::commentsUpdated, this,
-            [=](const QString &rn, const QVector<CommentDto> &comments)
-            {
-                if (rn != m_resourceName) return;
-
-                ui->listWidgetComments->clear();
-
-                //显示格式：用户名 + 时间 + 内容（content 允许换行）
-                for (const auto &c : comments)
-                {
-                    const QString text = QString("%1  %2\n%3")
-                        .arg(c.username)
-                        .arg(c.createdAt)
-                        .arg(c.content);
-
-                    //用 item data 保存主键信息，删除时不需要从文本解析
-                    auto *item = new QListWidgetItem(text);
-                    item->setData(ROLE_COMMENT_ID, c.id);
-                    item->setData(ROLE_OWNER_UID,  c.userId);
-
-                    ui->listWidgetComments->addItem(item);
-                }
-            });
-
-    //---------------------------
-    //右键菜单：每一行弹“删除”（只对 item 生效）
-    //---------------------------
-    ui->listWidgetComments->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(ui->listWidgetComments, &QListWidget::customContextMenuRequested,
-            this, [=](const QPoint &pos)
-            {
-                QListWidgetItem *item = ui->listWidgetComments->itemAt(pos);
-                if (!item) return; //点到空白处，不弹
-
-                const qint64 commentId = item->data(ROLE_COMMENT_ID).toLongLong();
-                const qint64 ownerUid  = item->data(ROLE_OWNER_UID).toLongLong();
-
-                QMenu menu(this);
-                QAction *actDelete = menu.addAction("删除");
-
-                //客户端仅做体验层限制：不是本人评论就禁用“删除”
-                //服务端仍必须做强校验（防止伪造请求）
-                if (ownerUid != m_userId)
-                    actDelete->setEnabled(false);
-
-                QAction *chosen = menu.exec(ui->listWidgetComments->viewport()->mapToGlobal(pos));
-                if (!chosen) return;
-
-                if (chosen == actDelete)
-                {
-                    if (commentId <= 0) return;
-
-                    if (QMessageBox::question(this, "确认", "确定要删除这条留言吗？")!= QMessageBox::Yes)
-                        return;
-
-                    //UI 不拼协议，交给 FileClient
-                    m_fileClient->deleteComment(m_userId, commentId);
-                }
-            });
-
 
     //删除结果：成功就刷新列表，失败就提示原因
     connect(m_fileClient, &FileClient::commentDelOk, this, [=](qint64){

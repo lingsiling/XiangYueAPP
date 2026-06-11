@@ -29,12 +29,16 @@ public:
     struct SessionRow {
         qint64 id = 0;
         qint64 userId = 0;
+        QString title;          // 批次名
         QString tags;
-        QString description;
+        QString description;    // 资源介绍
         int fileCount = 0;
         QString createdAt;
     };
     QList<SessionRow> listAllSessions();
+
+    // 根据 sessionId 查询上传者用户名
+    QString uploaderNameBySessionId(qint64 sessionId);
 
     std::optional<qint64> insertByFileName(qint64 userId, const QString &filename);
     bool deleteByResourceId(qint64 resourceId);
