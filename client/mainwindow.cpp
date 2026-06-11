@@ -5,7 +5,6 @@
 #include "uploadresourcedialog.h"
 #include "resourcedetaildialog.h"
 #include "fileclient.h"
-#include "transferdialog.h"
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFile>
@@ -74,8 +73,6 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         }
     });
 
-    // 保留旧 LIST 兼容（通过 resourcesUpdated 信号）
-
     //搜索按钮
     connect(ui->buttonSearch, &QPushButton::clicked, this, [=](){
         QString key = ui->searchline->text();
@@ -135,7 +132,7 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 void MainWindow::refreshList(const QStringList &list)
 {
     ui->treeWidgetResources->clear();
-    // 旧 LIST 兼容：每行显示文件名
+    //每行显示文件名
     for (const QString &fileName : list) {
         if (!fileName.isEmpty()) {
             auto *item = new QTreeWidgetItem();
@@ -168,44 +165,6 @@ void MainWindow::requestAvatarIfNeeded()
     //头像下载复用 FILE 机制，所以直接让服务端发 FILE##... 回来
     const QString cmd = QString("GET_AVATAR##%1\n").arg(m_session.userId);
     tcpSocket->write(cmd.toUtf8());
-}
-
-void MainWindow::showUploadProgressDialog()
-{
-    //如果对话框已存在且仍在显示，则不重复创建
-    if (m_uploadDialog != nullptr) {
-        m_uploadDialog->activateWindow();
-        m_uploadDialog->raise();
-        return;
-    }
-
-    //创建新的上传进度条对话框
-    m_uploadDialog = new TransferDialog(this);
-    m_uploadDialog->setTransferType(TransferDialog::Upload);
-
-    //连接上传进度信号
-    connect(fileClient, &FileClient::uploadProgress,
-            m_uploadDialog, &TransferDialog::updateProgress);
-
-    //连接上传完成信号
-    connect(fileClient, &FileClient::uploadFinished,
-            m_uploadDialog, &TransferDialog::completeTransfer);
-
-    //连接取消上传请求信号
-    connect(m_uploadDialog, &TransferDialog::cancelRequested,
-            fileClient, &FileClient::cancelUploadRequested);
-
-    //对话框关闭后清理指针
-    connect(m_uploadDialog, &TransferDialog::finished,
-            this, [=]() {
-        if (m_uploadDialog) {
-            m_uploadDialog->deleteLater();
-            m_uploadDialog = nullptr;
-        }
-    });
-
-    //显示进度条对话框（非模态，允许事件循环处理）
-    m_uploadDialog->show();
 }
 
 void MainWindow::showMyUploadDialog()

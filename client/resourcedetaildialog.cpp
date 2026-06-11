@@ -1,6 +1,5 @@
 #include "resourcedetaildialog.h"
 #include "ui_resourcedetaildialog.h"
-#include "transferdialog.h"
 #include <QMessageBox>
 #include <QListWidget>
 #include <QMenu>
@@ -46,12 +45,19 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     ui->labelBatchTitle->setText(m_resourceName);
     ui->buttonFavorite->setText("收藏");
 
-    // ====== 显示标签（直接通过构造函数参数传入，不再用 setProperty） ======
+    // ====== 标签展示：用 QListWidget 实现每个 tag 独立背景色块 ======
+    // 与上传资源详情界面的 listWidgetTags 保持一致的视觉效果
+    // tags 格式：以 "|" 分隔，如 "数学|PPT|cpp"
     if (!tags.isEmpty()) {
-        ui->labelTags->setText(QString("标签：%1")
-            .arg(QString(tags).replace('|', " | ")));
+        const QStringList tagList = tags.split('|', Qt::SkipEmptyParts);
+        for (const QString &tag : tagList) {
+            const QString trimmed = tag.trimmed();
+            if (!trimmed.isEmpty()) {
+                ui->listWidgetTags->addItem(trimmed);       // 每个标签单独一个 item
+            }
+        }
     } else {
-        ui->labelTags->setText(QString("标签：暂无"));
+        ui->listWidgetTags->addItem(QString("暂无标签"));   // 无标签时占位提示
     }
 
     // ====== 下载计数逻辑：多文件下载只弹一次提示 ======

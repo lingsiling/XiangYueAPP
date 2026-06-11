@@ -22,7 +22,6 @@ SOURCES += \
     myuploaddialog.cpp \
     resourcedetaildialog.cpp \
     resourcesearch.cpp \
-    transferdialog.cpp \
     uploadresourcedialog.cpp \
     usersession.cpp
 
@@ -34,7 +33,6 @@ HEADERS += \
     myuploaddialog.h \
     resourcedetaildialog.h \
     resourcesearch.h \
-    transferdialog.h \
     uploadresourcedialog.h \
     usersession.h
 
@@ -42,7 +40,6 @@ FORMS += \
     logdialog.ui \
     mainwindow.ui \
     resourcedetaildialog.ui \
-    transferdialog.ui \
     favoritesdialog.ui \
     myuploaddialog.ui \
     uploadresourcedialog.ui
@@ -56,5 +53,5 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 RESOURCES += \
-    qss.qrc
+    qss.qrc \
     avatars.qrc

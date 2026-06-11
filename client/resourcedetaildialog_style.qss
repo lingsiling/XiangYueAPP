@@ -26,7 +26,6 @@ ResourceDetailDialog QFrame {
 
 /* 标题标签（单独指定，不影响 QMessageBox） */
 ResourceDetailDialog QLabel#labelSessionTitle,
-ResourceDetailDialog QLabel#labelTags,
 ResourceDetailDialog QLabel#labelUploader,
 ResourceDetailDialog QLabel#labelUploadTime,
 ResourceDetailDialog QLabel#labelDescTitle,
@@ -113,6 +112,23 @@ ResourceDetailDialog QListWidget::item:selected,
 ResourceDetailDialog QTreeWidget::item:selected {
     background: rgba(255, 216, 155, 0.3);
     border: 1px solid rgba(255, 216, 155, 0.5);
+}
+
+/* ============================================
+   标签流式列表样式（listWidgetTags）
+   与上传资源详情界面风格统一：暖金色半透明椭圆背景
+   ============================================ */
+ResourceDetailDialog QListWidget#listWidgetTags {
+    background: transparent;              /* 外层无背景 */
+    border: none;
+    outline: none;
+}
+
+ResourceDetailDialog QListWidget#listWidgetTags::item {
+    background: rgba(255, 216, 155, 0.20);    /* 暖金色半透明底 */
+    color: #FFD89B;                            /* 暖金色文字 */
+    border-radius: 8px;                        /* 圆角椭圆 */
+    padding: 3px 10px;
 }
 
 /* ============================================
