@@ -130,26 +130,25 @@ void ClientWorker::tryProcessLines()
         const QString line = QString::fromUtf8(raw).trimmed();
 
         if (line == "LIST_SESSIONS") {
-            //返回所有批次列表
-            handleListSessionsCommand();
+            handleListSessionsCommand();//返回所有批次列表
         }
-        else if (line.startsWith("SESSION_FILES##")) {
-            //返回某批次的文件列表
-            handleSessionFilesCommand(line);
+        else if (line.startsWith("SESSION_FILES##")) { 
+            handleSessionFilesCommand(line);//返回某批次的文件列表
         }
         else if (line.startsWith("DOWNLOAD##")) {
             const QString fn = line.section("##", 1, 1).trimmed();
             handleDownloadCommand(fn);
         }
+
         // ------------------------------------------------------------------------
         // 协议识别：上传类命令
         //   UPLOAD_BATCH##N##uid##tags_b64##desc_b64  → 批次模式（N次 FILE 跟随）
         //   UPLOAD##name##size##uid                      → 旧单文件（向后兼容）
         //   FILE##size##name_b64                        → 新单文件/批次内文件
         // ------------------------------------------------------------------------
+
         else if (line.startsWith("UPLOAD_BATCH##")) {
-            // 批次上传模式入口：记录文件总数、标签、介绍，后续 FILE## 头跟随
-            handleBatchUploadCommand(line);
+            handleBatchUploadCommand(line);// 批次上传模式入口：记录文件总数、标签、介绍，后续 FILE## 头跟随
         }
         else if (line.startsWith("FILE##")) {
             startReceivingFile(line);

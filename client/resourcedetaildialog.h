@@ -27,8 +27,10 @@ public:
     void on_buttonDownload_clicked() {}
     void on_buttonComment_clicked();
     void on_buttonFavorite_clicked();
-    void onDownloadSelected();            // "下载选中" 按钮：批量下载选中的文件
     void onDownloadAll();                 // "下载全部" 按钮：下载列表所有文件
+
+    // 评论列表右键菜单：删除选中的评论（仅限删除自己发布的）
+    void onCommentContextMenu(const QPoint &pos);
 
 private:
     Ui::ResourceDetailDialog *ui;

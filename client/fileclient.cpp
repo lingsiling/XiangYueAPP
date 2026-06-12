@@ -62,23 +62,22 @@ void FileClient::tryProcessLines()
         else if (line.startsWith("BATCH_OK##"))
         {
             // ============================================================
-            //  服务端批次入库成功回复：BATCH_OK##sessionId
-            //  sessionId 对应 upload_sessions 表的 id，后续可查历史
-            //  收到后自动请求 LIST 刷新主界面，让用户看到刚上传的全部文件
+            //  BATCH_OK##sessionId — 服务端批次入库确认
+            //  收到后主界面刷新批次列表，用户可立刻看到刚上传的资源
             // ============================================================
             const qint64 sessionId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
             emit logLine(QString("批次上传完成！批次ID: %1").arg(sessionId));
-            emit batchUploadFinished(sessionId);     // 通知关注者
-            requestAllSessions();                      // 新协议：刷新批次列表
+            emit batchUploadFinished(sessionId);     // 通知主界面等监听者
+            requestAllSessions();                      // 自动刷新批次列表
         }
         else if (line.startsWith("BATCH_FAIL##"))
         {
-            // 服务端批次入库失败：BATCH_FAIL##失败原因
+            // BATCH_FAIL##reason — 批次入库失败（事务回滚/参数错误等）
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit logLine(QString("批次上传失败: %1").arg(reason));
         }
-        // 接收上传者信息：UPLOADER##name(B64)
-    else if (line.startsWith("UPLOADER##"))
+        // ====== 上传者信息解析（详情页显示用） ======
+        else if (line.startsWith("UPLOADER##"))
     {
         const QString name = fromB64(QString::fromUtf8(line).section("##", 1).trimmed());
         emit uploaderReceived(name);

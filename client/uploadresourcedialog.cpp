@@ -41,22 +41,26 @@ UploadResourceDialog::UploadResourceDialog(FileClient *fileClient, qint64 userId
         setStyleSheet(QLatin1String(qssFile.readAll()));
         qssFile.close();
     }
-    // ====== 信号-槽绑定：UI 控件 → 业务逻辑 ======
+    // ====== 信号-槽绑定 ======
+    // 按钮点击
     connect(ui->btnSelectFiles,  &QPushButton::clicked, this, &UploadResourceDialog::onSelectFiles);
     connect(ui->btnClearFiles,   &QPushButton::clicked, this, &UploadResourceDialog::onClearFiles);
     connect(ui->btnAddTag,       &QPushButton::clicked, this, &UploadResourceDialog::onAddTag);
     connect(ui->btnSubmit,       &QPushButton::clicked, this, &UploadResourceDialog::onSubmit);
     connect(ui->btnCancel,       &QPushButton::clicked, this, &QDialog::reject);
 
-    // 输入标签后按回车也能添加（不用鼠标点按钮）
-    connect(ui->lineEditTag, &QLineEdit::returnPressed, this, &UploadResourceDialog::onAddTag);
-
-    // 树形列表选择变化时更新统计
+    // 文件列表行数变更 → 自动更新统计标签
     connect(ui->treeWidgetFiles, &QTreeWidget::itemSelectionChanged, this, [this]() {
-        int total = ui->treeWidgetFiles->topLevelItemCount();
-        int selected = ui->treeWidgetFiles->selectedItems().size();
-        ui->labelFileStats->setText(QString("已选 %1 个文件（共 %2 个）").arg(selected).arg(total));
+        const int total = ui->treeWidgetFiles->topLevelItemCount();
+        const int selCount = ui->treeWidgetFiles->selectedItems().size();
+        ui->labelFileStats->setText(QString("已选择 %1 个文件（共 %2 个）").arg(selCount).arg(total));
     });
+
+    // 统计标签初始显示
+    ui->labelFileStats->setText("已选择 0 个文件（共 0 个）");
+
+    // 光标在标签输入框时按回车 → 自动添加标签
+    connect(ui->lineEditTag, &QLineEdit::returnPressed, this, &UploadResourceDialog::onAddTag);
 
     // 设置表头拉伸
     ui->treeWidgetFiles->header()->setStretchLastSection(true);

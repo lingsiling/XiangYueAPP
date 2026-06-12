@@ -7,13 +7,13 @@
     <x>0</x>
     <y>0</y>
     <width>680</width>
-    <height>850</height>
+    <height>840</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>560</width>
-    <height>450</height>
+    <width>680</width>
+    <height>840</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -171,22 +171,6 @@
     </widget>
    </item>
    <item>
-    <spacer name="verticalSpacerBeforeFiles">
-     <property name="orientation">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Fixed</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>12</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item>
     <widget class="QLabel" name="labelFilesTitle">
      <property name="text">
       <string>本次上传的文件</string>
@@ -229,22 +213,6 @@
     </widget>
    </item>
    <item>
-    <spacer name="verticalSpacerBeforeComments">
-     <property name="orientation">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Fixed</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>16</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item>
     <widget class="QLabel" name="labelCommentsTitle">
      <property name="text">
       <string>评论</string>
@@ -259,23 +227,13 @@
        <height>80</height>
       </size>
      </property>
+     <property name="textElideMode">
+      <enum>Qt::TextElideMode::ElideNone</enum>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
     </widget>
-   </item>
-   <item>
-    <spacer name="verticalSpacerBeforeCommentInput">
-     <property name="orientation">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Fixed</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>10</height>
-      </size>
-     </property>
-    </spacer>
    </item>
    <item>
     <widget class="QTextEdit" name="textEditComment">

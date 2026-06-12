@@ -132,6 +132,30 @@ ResourceDetailDialog QListWidget#listWidgetTags::item {
 }
 
 /* ============================================
+   评论列表聊天气泡样式（listWidgetComments）
+   纯透明背景 + 无选中高亮，每条评论像 QQ 气泡一样独立浮在透明区域上
+   ============================================ */
+ResourceDetailDialog QListWidget#listWidgetComments {
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+ResourceDetailDialog QListWidget#listWidgetComments::item {
+    background: transparent;            /* 整行无背景 */
+    color: white;
+    padding: 4px 0px;
+    border: none;
+}
+
+ResourceDetailDialog QListWidget#listWidgetComments::item:hover,
+ResourceDetailDialog QListWidget#listWidgetComments::item:selected {
+    background: transparent;            /* 去除点击/悬停变色 */
+    color: white;
+    border: none;
+}
+
+/* ============================================
    滚动条样式
    ============================================ */
 ResourceDetailDialog QScrollBar:vertical {
