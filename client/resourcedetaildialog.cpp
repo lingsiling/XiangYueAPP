@@ -141,6 +141,10 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
                 auto *item = new QListWidgetItem(display);
                 item->setData(ROLE_COMMENT_ID, c.id);
                 item->setData(ROLE_OWNER_UID, c.userId);
+                // 标记评论归属：本人评论(靠右) / 他人评论(靠左)
+                // 仅打标记，左右布局完全交给 CommentBubbleDelegate（低耦合）
+                item->setData(CommentBubbleDelegate::IsMineRole,
+                              (m_userId > 0 && c.userId == m_userId));
                 ui->listWidgetComments->addItem(item);
             }
         });
