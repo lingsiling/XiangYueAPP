@@ -19,8 +19,6 @@
 class UploadRepository
 {
 public:
-    std::optional<qint64> insert(qint64 userId, qint64 resourceId);
-
     // 按 session_id 查询该批次的所有文件记录
     // 返回值是 resources 表中属于该批次的全部条目
     QList<ResourceRecord> listBySessionId(qint64 sessionId);
@@ -37,11 +35,22 @@ public:
     };
     QList<SessionRow> listAllSessions();
 
+    // 查询某个用户的全部批次（upload_sessions 表），按时间倒序
+    // 用于"我的上传"——只列出当前登录用户自己上传的批次
+    QList<SessionRow> listSessionsByUser(qint64 userId);
+
     // 根据 sessionId 查询上传者用户名
     QString uploaderNameBySessionId(qint64 sessionId);
 
-    std::optional<qint64> insertByFileName(qint64 userId, const QString &filename);
-    bool deleteByResourceId(qint64 resourceId);
+    // 查询某个批次的所属用户ID（用于删除批次时做归属校验、定位磁盘目录）
+    // 批次不存在时返回 std::nullopt
+    std::optional<qint64> sessionUserId(qint64 sessionId);
+
+    // 删除某批次在 uploads 表中的全部关联记录（按 session_id 整批清理）
+    bool deleteUploadsBySessionId(qint64 sessionId);
+
+    // 删除 upload_sessions 表中的批次记录本身
+    bool deleteSessionRow(qint64 sessionId);
 };
 
 #endif // UPLOADREPOSITORY_H

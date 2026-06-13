@@ -60,7 +60,6 @@ private:
 
     //命令分发（分为同步和异步两类）
     // 同步命令
-    void handleListCommand();
     void handleDownloadCommand(const QString &line);
     void handleListSessionsCommand();                     // 新：返回批次列表
     void handleSessionFilesCommand(const QString &line);  // 新：返回某批次的文件列表
@@ -72,7 +71,7 @@ private:
     void handleCommentListCommand(const QString &line);
     void handleCommentAddCommand(const QString &line);
     void handleCommentDelCommand(const QString &line);
-    void handleDeleteResourceCommand(const QString &line);
+    void handleDeleteSessionCommand(const QString &line);   // 删除整个上传批次
     void handleMyUploadsCommand(const QString &line);
     void handleAddFavoriteCommand(const QString &line);
     void handleGetFavoritesCommand(const QString &line);
@@ -82,7 +81,6 @@ private:
     //批次上传
     void handleBatchUploadCommand(const QString &line);   // 解析 UPLOAD_BATCH 头
     void finalizeBatchUpload();                             // 批次收尾
-    void finalizeSingleUpload(const QString &filePath);     // 单文件收尾（也走批次入库）
 
     //工具函数
     static QString toB64(const QString &s);

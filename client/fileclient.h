@@ -1,14 +1,14 @@
 /*
  * FileClient：客户端网络模块（纯逻辑类）
  * 作用：
- * 1. 上传文件（支持多文件队列）
- * 2. 请求文件列表
+ * 1. 批次上传文件（一次上传多个文件 + 标签 + 资源介绍）
+ * 2. 请求批次列表 / 批次内文件列表
  * 3. 下载文件
- * 4. 评论/删除评论
+ * 4. 评论、收藏、我的上传
  *
  * 设计要点（低耦合）：
- * - UI 只调用 uploadFile()/uploadFiles()，不关心协议细节
- * - FileClient 内部维护上传队列：一次只上传一个文件，等待服务端 UPLOAD_OK 再继续下一个
+ * - UI 只调用 uploadBatch()，不关心协议细节
+ * - 协议解析（行协议 + 二进制下载）全部封装在本类内部
  */
 
 #ifndef FILECLIENT_H
@@ -19,7 +19,6 @@
 #include <QFile>
 #include <QTimer>
 #include <QVector>
-#include <QQueue>
 #include <QFileInfo>
 
 class MainWindow;
@@ -32,14 +31,6 @@ struct CommentDto
     QString username;
     QString createdAt;
     QString content;
-};
-
-//MyUploadDto：客户端"我的上传"列表项（旧协议，保留兼容）
-struct MyUploadDto
-{
-    QString fileName;
-    qint64 size = 0;
-    QString uploadedAt;
 };
 
 // 上传批次DTO：主界面列表中的一条
@@ -72,12 +63,6 @@ public:
 
     //对外接口
     //资源文件相关
-    //单文件上传
-    void uploadFile(QString filePath);
-
-    //多文件上传：把文件路径加入队列，按顺序逐个上传（旧接口，保留兼容）
-    void uploadFiles(const QStringList &filePaths);
-
     // ====== 批次上传：一次上传包含多个文件 + 标签 + 资源介绍 ======
     // 协议三步流程：
     //   1. UPLOAD_BATCH##文件数##userId##标签(B64)##介绍(B64)\n   …批次头
@@ -92,7 +77,6 @@ public:
     // ====== 新增：批次列表协议 ======
     void requestAllSessions();                          // 请求所有上传批次（替代旧 LIST）
     void requestSessionFiles(qint64 sessionId);         // 请求某批次的文件列表（点击后调用）
-    void requestList();
     void downloadFile(QString fileName);
 
     //评论相关（UI 只调这些接口，不关心协议）
@@ -104,8 +88,8 @@ public:
     //我的上传：按用户ID请求上传记录
     void requestMyUploads(qint64 userId);
 
-    //我的上传删除：只传文件名，由服务端统一清理资源和上传记录
-    void deleteMyUpload(const QString &fileName);
+    //我的上传删除：只传批次ID，由服务端在一个事务里清理整批文件/记录
+    void deleteMyUploadSession(qint64 sessionId);
 
     //收藏功能：添加收藏（收藏/取消收藏的入口之一）
     void addFavorite(const QString &resourceName);
@@ -137,9 +121,9 @@ private:
     QString m_commentResource;
     QVector<CommentDto> m_pendingComments;
 
-    //我的上传解析缓存（BEGIN -> ITEM... -> END）
+    //我的上传解析缓存（BEGIN -> ITEM... -> END），现按"批次"组织，复用 SessionDto
     qint64 m_myUploadsUserId = 0;
-    QVector<MyUploadDto> m_pendingMyUploads;
+    QVector<SessionDto> m_pendingMyUploads;
 
     //批次列表解析缓存
     QVector<SessionDto> m_pendingSessions;
@@ -147,21 +131,6 @@ private:
     //批次内文件列表解析缓存
     qint64 m_pendingSessionId = 0;
     QVector<ResourceDto> m_pendingResources;
-
-    //上传队列（多文件上传核心）
-    struct UploadTask {
-        QString path;      //本地路径
-        QString name;      //文件名（协议里用）
-        qint64 size = 0;   //文件大小
-    };
-
-    QQueue<UploadTask> m_uploadQueue;   //等待上传的文件队列
-    QFile m_uploadFile;                 //当前正在上传的文件
-    bool m_isUploading = false;         //当前是否处于“等待服务端确认/正在发送”状态
-
-private:
-    //启动下一次上传（若队列为空则结束）
-    void startNextUpload();
 
 private:
     void handleDownload(QByteArray data); //下载处理
@@ -218,11 +187,11 @@ signals:
     void commentDelOk(qint64 commentId);
     void commentDelFail(const QString &reason);
 
-    void deleteMyUploadOk(const QString &fileName);
+    void deleteMyUploadOk(qint64 sessionId);
     void deleteMyUploadFail(const QString &reason);
 
-    //“我的上传”列表刷新结果
-    void myUploadsUpdated(qint64 userId, const QVector<MyUploadDto> &items);
+    //"我的上传"列表刷新结果（按批次返回，复用 SessionDto）
+    void myUploadsUpdated(qint64 userId, const QVector<SessionDto> &items);
     //收藏操作结果：成功时返回资源名，UI 据此更新按钮状态
     void addFavoriteOk(const QString &resourceName);
     void addFavoriteFail(const QString &reason);

@@ -19,8 +19,8 @@ public:
 
 private:
     void refreshUploads();
-    void renderUploads(const QVector<MyUploadDto> &items);
-    QString selectedUploadFileName() const;
+    void renderUploads(const QVector<SessionDto> &items);
+    qint64 selectedSessionId() const;
 
 private:
     Ui::MyUploadDialog *ui;

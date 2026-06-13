@@ -175,8 +175,8 @@ void ClientWorker::tryProcessLines()
         else if (line.startsWith("COMMENT_DEL##")) {
             handleCommentDelCommand(line);
         }
-        else if (line.startsWith("DELETE_RESOURCE##") || line.startsWith("DELETE_FILE##")) {
-            handleDeleteResourceCommand(line);
+        else if (line.startsWith("DELETE_SESSION##")) {
+            handleDeleteSessionCommand(line);
         }
         else if (line.startsWith("MY_UPLOADS##")) {
             handleMyUploadsCommand(line);
@@ -328,12 +328,6 @@ void ClientWorker::sendFile(const QString &fileName)
 
     f.close();
     qDebug() << "[Worker] 文件已发送:" << nameOnly << "(" << size << "字节)";
-}
-
-void ClientWorker::handleListCommand()
-{
-    qDebug() << "[Worker] 处理LIST命令";
-    sendFileList();
 }
 
 void ClientWorker::handleDownloadCommand(const QString &fileName)
@@ -539,45 +533,50 @@ void ClientWorker::handleCommentDelCommand(const QString &line)
     }, TaskQueue::NORMAL, QString("COMMENT_DEL_%1").arg(commentId));
 }
 
-void ClientWorker::handleDeleteResourceCommand(const QString &line)
+void ClientWorker::handleDeleteSessionCommand(const QString &line)
 {
-    //资源删除命令：文件系统删文件，资源表删记录，保持两边一致
-    const QString fileName = line.section("##", 1, 1).trimmed();
+    //删除整个上传批次：行协议 DELETE_SESSION##sessionId
+    const qint64 sessionId = line.section("##", 1, 1).trimmed().toLongLong();
 
-    qDebug() << "[Worker] 处理资源删除命令:" << fileName;
+    qDebug() << "[Worker] 处理批次删除命令: sessionId=" << sessionId
+             << " userId=" << m_currentUserId;
 
-    ResourceService service;
-    //由业务层统一处理删文件和删记录，Worker 只负责协议分发
-    auto res = service.deleteFileAndUploadRecord(m_resourceDir, fileName);
+    //业务层在一个事务里清理 文件/resources/uploads/favorites/upload_sessions，
+    //Worker 只负责协议分发与归属用户传递（m_currentUserId 登录时已置位）
+    UploadService service;
+    const auto res = service.deleteSession(m_resourceDir, sessionId, m_currentUserId);
 
     if (res.ok) {
-        sendResponse(QString("DELETE_RESOURCE_OK##%1\n").arg(fileName));
+        sendResponse(QString("DELETE_SESSION_OK##%1\n").arg(sessionId));
     } else {
-        sendResponse(QString("DELETE_RESOURCE_FAIL##%1\n").arg(res.reason));
+        sendResponse(QString("DELETE_SESSION_FAIL##%1\n").arg(res.reason));
     }
 }
 
 void ClientWorker::handleMyUploadsCommand(const QString &line)
 {
-    //行协议：MY_UPLOADS##userId
+    //行协议：MY_UPLOADS##userId —— 返回该用户的"上传批次"列表（不再是单个文件）
     const qint64 userId = line.section("##", 1, 1).toLongLong();
 
-    qDebug() << "[Worker] 处理我的上传查询，userId=" << userId;
+    qDebug() << "[Worker] 处理我的上传查询（按批次），userId=" << userId;
 
-    ResourceService service;
-    const auto res = service.listByUploader(userId);
+    UploadService service;
+    const auto sessions = service.listSessionsByUser(userId);
 
     //固定 begin/end 包裹，客户端可以稳态刷新 UI
+    //ITEM 字段顺序与 SESSION_ITEM 完全一致，客户端共用 SessionDto 解析
     sendResponse(QString("MY_UPLOADS_BEGIN##%1\n").arg(userId));
 
-    if (res.ok) {
-        for (const auto &item : res.items) {
-            const QString msg = QString("MY_UPLOADS_ITEM##%1##%2##%3\n")
-                    .arg(toB64(item.filename))
-                    .arg(item.size)
-                    .arg(toB64(item.uploadedAt));
-            sendResponse(msg);
-        }
+    for (const auto &s : sessions) {
+        const QString msg = QString("MY_UPLOADS_ITEM##%1##%2##%3##%4##%5##%6##%7\n")
+                .arg(s.id)
+                .arg(s.userId)
+                .arg(toB64(s.title))          // 批次名
+                .arg(toB64(s.tags))
+                .arg(toB64(s.description))    // 资源介绍
+                .arg(s.fileCount)
+                .arg(toB64(s.createdAt));
+        sendResponse(msg);
     }
 
     sendResponse(QString("MY_UPLOADS_END##%1\n").arg(userId));
@@ -749,26 +748,6 @@ void ClientWorker::finalizeBatchUpload()
     m_batchRecvCount = 0;
     m_batchTags.clear();
     m_batchDesc.clear();
-    m_batchSubDir.clear();
-    m_uploadUserId = 0;
-}
-
-// 单文件上传也用批次入库（session 只含一个文件）
-void ClientWorker::finalizeSingleUpload(const QString &filePath)
-{
-    UploadService service;
-    auto res = service.recordBatchUploadedFiles(
-        {filePath}, m_uploadUserId, m_batchName, {}, {});
-
-    if (res.ok) {
-        const QString ok = QString("BATCH_OK##%1\n").arg(res.sessionId);
-        m_socket->write(ok.toUtf8());
-    } else {
-        const QString fail = QString("BATCH_FAIL##%1\n").arg(res.reason);
-        m_socket->write(fail.toUtf8());
-    }
-
-    sendFileList();
     m_batchSubDir.clear();
     m_uploadUserId = 0;
 }

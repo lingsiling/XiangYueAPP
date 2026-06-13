@@ -5,80 +5,36 @@
 #include <QSqlQuery>
 #include <QDebug>
 
-std::optional<qint64> UploadRepository::insert(qint64 userId, qint64 resourceId)
+bool UploadRepository::deleteUploadsBySessionId(qint64 sessionId)
 {
-	if (userId <= 0 || resourceId <= 0)
-		return std::nullopt;
-
-    //同一个资源只保留一条上传记录：如果已经存在，直接返回已有记录 ID
-	QSqlQuery existsQuery(DBConnectionPool::instance().connection());
-	existsQuery.prepare("SELECT id FROM uploads WHERE resource_id = ? LIMIT 1");
-	existsQuery.addBindValue(resourceId);
-	if (!existsQuery.exec()) {
-		qDebug() << "[UploadRepo] exists check failed:" << existsQuery.lastError().text();
-		return std::nullopt;
-	}
-
-	if (existsQuery.next()) {
-		const qint64 existingId = existsQuery.value(0).toLongLong();
-		qDebug() << "[UploadRepo] skip duplicate upload record, resourceId=" << resourceId
-		         << "existingId=" << existingId;
-		return existingId;
-	}
-
-    //只负责把“谁上传了哪个资源”写入 uploads 表
-	QSqlQuery q(DBConnectionPool::instance().connection());
-	q.prepare(R"SQL(
-		INSERT INTO uploads(user_id, resource_id)
-		VALUES(?, ?)
-	)SQL");
-	q.addBindValue(userId);
-	q.addBindValue(resourceId);
-
-	if (!q.exec()) {
-		qDebug() << "[UploadRepo] insert failed:" << q.lastError().text();
-		return std::nullopt;
-	}
-
-	return q.lastInsertId().toLongLong();
-}
-
-std::optional<qint64> UploadRepository::insertByFileName(qint64 userId, const QString &filename)
-{
-	const QString name = filename.trimmed();
-	if (userId <= 0 || name.isEmpty())
-		return std::nullopt;
-
-    //先查出 resources.id，再调用通用 insert 插入 uploads，避免 INSERT...SELECT 在某些驱动上不返回 lastInsertId
-	QSqlQuery q(DBConnectionPool::instance().connection());
-	q.prepare("SELECT id FROM resources WHERE filename = ?");
-	q.addBindValue(name);
-	if (!q.exec()) {
-		qDebug() << "[UploadRepo] find resource failed:" << q.lastError().text();
-		return std::nullopt;
-	}
-
-	if (!q.next()) {
-		qDebug() << "[UploadRepo] resource not found for filename:" << name;
-		return std::nullopt;
-	}
-
-	const qint64 resourceId = q.value(0).toLongLong();
-	return insert(userId, resourceId);
-}
-
-bool UploadRepository::deleteByResourceId(qint64 resourceId)
-{
-	if (resourceId <= 0)
+	if (sessionId <= 0)
 		return false;
 
-    //资源删除时同步清理 uploads，避免“我的上传”里残留记录
+    //删除整个批次：清理该批次在 uploads 表中的全部”文件-批次”关联记录
 	QSqlQuery q(DBConnectionPool::instance().connection());
-	q.prepare("DELETE FROM uploads WHERE resource_id = ?");
-	q.addBindValue(resourceId);
+	q.prepare("DELETE FROM uploads WHERE session_id = ?");
+	q.addBindValue(sessionId);
 
 	if (!q.exec()) {
-		qDebug() << "[UploadRepo] deleteByResourceId failed:" << q.lastError().text();
+		qDebug() << "[UploadRepo] deleteUploadsBySessionId failed:" << q.lastError().text();
+		return false;
+	}
+
+	return true;
+}
+
+bool UploadRepository::deleteSessionRow(qint64 sessionId)
+{
+	if (sessionId <= 0)
+		return false;
+
+    //删除批次记录本身：upload_sessions 中代表”一次上传”的那一行
+	QSqlQuery q(DBConnectionPool::instance().connection());
+	q.prepare("DELETE FROM upload_sessions WHERE id = ?");
+	q.addBindValue(sessionId);
+
+	if (!q.exec()) {
+		qDebug() << "[UploadRepo] deleteSessionRow failed:" << q.lastError().text();
 		return false;
 	}
 
@@ -139,6 +95,25 @@ QString UploadRepository::uploaderNameBySessionId(qint64 sessionId)
     return {};
 }
 
+// ====== 查询某批次所属用户ID（删除批次时做归属校验/定位目录） ======
+std::optional<qint64> UploadRepository::sessionUserId(qint64 sessionId)
+{
+    if (sessionId <= 0) return std::nullopt;
+
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare("SELECT user_id FROM upload_sessions WHERE id = ?");
+    q.addBindValue(sessionId);
+
+    if (!q.exec()) {
+        qDebug() << "[UploadRepo] sessionUserId failed:" << q.lastError().text();
+        return std::nullopt;
+    }
+    if (!q.next())
+        return std::nullopt;          // 批次不存在
+
+    return q.value(0).toLongLong();
+}
+
 // ====== 查询所有批次列表（主界面展示用） ======
 QList<UploadRepository::SessionRow> UploadRepository::listAllSessions()
 {
@@ -152,6 +127,39 @@ QList<UploadRepository::SessionRow> UploadRepository::listAllSessions()
 
     if (!q.exec()) {
         qDebug() << "[UploadRepo] listAllSessions failed:" << q.lastError().text();
+        return list;
+    }
+
+    while (q.next()) {
+        SessionRow row;
+        row.id = q.value(0).toLongLong();
+        row.userId = q.value(1).toLongLong();
+        row.title = q.value(2).toString();
+        row.tags = q.value(3).toString();
+        row.description = q.value(4).toString();
+        row.fileCount = q.value(5).toInt();
+        row.createdAt = q.value(6).toString();
+        list.append(row);
+    }
+    return list;
+}
+
+// ====== 查询某个用户的全部批次（"我的上传"展示用） ======
+// 与 listAllSessions 的唯一区别：加 user_id 过滤，只返回当前用户自己的批次
+QList<UploadRepository::SessionRow> UploadRepository::listSessionsByUser(qint64 userId)
+{
+    QList<SessionRow> list;
+    if (userId <= 0) return list;
+
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare(R"SQL(
+        SELECT id, user_id, title, tags, description, file_count, created_at
+        FROM upload_sessions WHERE user_id = ? ORDER BY created_at DESC
+    )SQL");
+    q.addBindValue(userId);
+
+    if (!q.exec()) {
+        qDebug() << "[UploadRepo] listSessionsByUser failed:" << q.lastError().text();
         return list;
     }
 

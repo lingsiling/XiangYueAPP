@@ -151,12 +151,13 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit commentDelFail(reason);
         }
-        else if (line.startsWith("DELETE_RESOURCE_OK##"))
+        else if (line.startsWith("DELETE_SESSION_OK##"))
         {
-            const QString fileName = QString::fromUtf8(line).section("##", 1, 1).trimmed();
-            emit deleteMyUploadOk(fileName);
+            //批次删除成功：解析批次ID，通知 UI 刷新
+            const qint64 sessionId = QString::fromUtf8(line).section("##", 1, 1).trimmed().toLongLong();
+            emit deleteMyUploadOk(sessionId);
         }
-        else if (line.startsWith("DELETE_RESOURCE_FAIL##"))
+        else if (line.startsWith("DELETE_SESSION_FAIL##"))
         {
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit deleteMyUploadFail(reason);
@@ -247,18 +248,6 @@ void FileClient::consumeDownloadData()
         // if (!fileName.startsWith("avatar_"))
         //     QMessageBox::information(mainWindow, "完成", "下载完成");
     }
-}
-
-//单文件上传：保持兼容（内部直接转到多文件上传）
-
-//多文件上传：把任务加入队列并启动
-
-//启动队列中的下一个文件上传（一次只上传一个）
-
-//向服务端发送请求列表
-void FileClient::requestList()
-{
-    tcpSocket->write("LIST\n");
 }
 
 //下载文件
@@ -383,13 +372,12 @@ void FileClient::deleteComment(qint64 userId, qint64 commentId)
     tcpSocket->write(cmd.toUtf8());
 }
 
-void FileClient::deleteMyUpload(const QString &fileName)
+void FileClient::deleteMyUploadSession(qint64 sessionId)
 {
-    const QString name = fileName.trimmed();
-    if (name.isEmpty()) return;
+    if (sessionId <= 0) return;
 
-    //行协议：复用服务端现有资源删除入口，服务端会同步清理 resources/uploads
-    const QString cmd = QString("DELETE_RESOURCE##%1\n").arg(name);
+    //行协议：DELETE_SESSION##sessionId —— 服务端在一个事务里清理整批文件与全部记录
+    const QString cmd = QString("DELETE_SESSION##%1\n").arg(sessionId);
     tcpSocket->write(cmd.toUtf8());
 }
 
@@ -454,13 +442,18 @@ void FileClient::handleMyUploadsBegin(const QByteArray &line)
 
 void FileClient::handleMyUploadsItem(const QByteArray &line)
 {
-    // MY_UPLOADS_ITEM##filename_b64##size##uploadedAt_b64
+    // MY_UPLOADS_ITEM##id##userId##title_b64##tags_b64##desc_b64##fileCount##createdAt_b64
+    // 字段顺序与 SESSION_ITEM 完全一致，故复用 SessionDto 解析
     const QString s = QString::fromUtf8(line);
 
-    MyUploadDto item;
-    item.fileName = fromB64(s.section("##", 1, 1));
-    item.size = s.section("##", 2, 2).toLongLong();
-    item.uploadedAt = fromB64(s.section("##", 3));
+    SessionDto item;
+    item.id          = s.section("##", 1, 1).toLongLong();
+    item.userId      = s.section("##", 2, 2).toLongLong();
+    item.title       = fromB64(s.section("##", 3, 3));
+    item.tags        = fromB64(s.section("##", 4, 4));
+    item.description = fromB64(s.section("##", 5, 5));
+    item.fileCount   = s.section("##", 6, 6).toInt();
+    item.createdAt   = fromB64(s.section("##", 7, 7));
     m_pendingMyUploads.push_back(item);
 }
 
@@ -484,9 +477,7 @@ void FileClient::handleMyUploadsEnd(const QByteArray &line)
 //   2. 然后逐个发 FILE##文件大小##文件名(B64)\n + 二进制数据
 //   3. 全部发完后，服务端事务入库 → 回复 BATCH_OK##sessionId
 //
-// 与旧 uploadFiles 的区别：
-//   - uploadFiles：逐个文件独立上传，每个文件立即入库、立即回复 UPLOAD_OK
-//   - uploadBatch：  整个批次在服务端事务中统一入库，全部成功才回复 BATCH_OK
+// 说明：整个批次在服务端事务中统一入库，全部文件成功才回复 BATCH_OK
 //
 // 参数：
 //   filePaths - 用户选中的全部文件绝对路径

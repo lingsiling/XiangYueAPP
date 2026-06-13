@@ -37,8 +37,6 @@ public:
     // 按文件名删除资源记录
     bool deleteByFileName(const QString &filename);
 
-    // 按上传者查询资源列表（用于“我的上传”）
-    QList<ResourceRecord> listByUploader(qint64 uploaderUserId);
     // 更新资源路径中匹配的子目录（用于批次上传后重命名 batch_xxx → session_<id>）
     bool updateServerPath(const QString &oldSubDir, const QString &newSubDir, qint64 sessionId);};
 

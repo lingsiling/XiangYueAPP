@@ -71,7 +71,10 @@ MyUploadDialog QPushButton#buttonDelete:pressed {
 /* ============================================
    列表组件样式
    ============================================ */
-MyUploadDialog QListWidget {
+/* ============================================
+   列表组件样式（QTreeWidget，与主界面资源列表保持一致）
+   ============================================ */
+MyUploadDialog QTreeWidget {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
@@ -79,18 +82,19 @@ MyUploadDialog QListWidget {
     color: white;
 }
 
-MyUploadDialog QListWidget::item {
+/* item 不能设 margin：多列时每个单元格各自留白，会把整行高亮裂成多块。
+   选中/悬停只改背景、不加逐格 border，保证整行高亮连成一整块。 */
+MyUploadDialog QTreeWidget::item {
     padding: 8px;
-    margin: 2px;
+    border: none;
 }
 
-MyUploadDialog QListWidget::item:hover {
+MyUploadDialog QTreeWidget::item:hover {
     background: rgba(255, 255, 255, 0.15);
 }
 
-MyUploadDialog QListWidget::item:selected {
+MyUploadDialog QTreeWidget::item:selected {
     background: rgba(255, 216, 155, 0.3);
-    border: 1px solid rgba(255, 216, 155, 0.5);
 }
 
 /* ============================================
