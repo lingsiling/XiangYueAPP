@@ -3,6 +3,9 @@ QT += widgets network
 CONFIG += c++17
 CONFIG += debug_and_release
 
+# 第三方库头文件搜索路径（hnswlib 为纯头文件库，无需链接）
+INCLUDEPATH += $$PWD/third_party
+
 # Debug configuration
 CONFIG(debug, debug|release) {
     CONFIG += console
@@ -22,7 +25,7 @@ SOURCES += \
     mainwindow.cpp \
     myuploaddialog.cpp \
     resourcedetaildialog.cpp \
-    resourcesearch.cpp \
+    tagsearchengine.cpp \
     uploadresourcedialog.cpp \
     usersession.cpp
 
@@ -34,7 +37,7 @@ HEADERS += \
     mainwindow.h \
     myuploaddialog.h \
     resourcedetaildialog.h \
-    resourcesearch.h \
+    tagsearchengine.h \
     uploadresourcedialog.h \
     usersession.h
 

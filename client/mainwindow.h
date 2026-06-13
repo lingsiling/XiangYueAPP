@@ -1,12 +1,14 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include  "resourcesearch.h"
+#include "tagsearchengine.h"
 #include "usersession.h"
+#include "fileclient.h"
 #include <QMainWindow>
 #include <QTcpSocket>
 #include <QFile>
 #include <QTreeWidget>
+#include <QVector>
 class FileClient;
 class MyUploadDialog;
 
@@ -30,11 +32,11 @@ protected:
     Ui::MainWindow *ui;
 
 private:
-    ResourceSearch m_search;        //搜索逻辑
-    QStringList m_allResources;     //全量资源（服务端 LIST）
+    TagSearchEngine m_tagSearch;        //标签搜索引擎（HNSW）
+    QVector<SessionDto> m_allSessions;  //全量资源批次（服务端推送）
     UserSession m_session;
     void requestAvatarIfNeeded();
-    void refreshList(const QStringList &list); //刷新UI
+    void renderSessions(const QVector<SessionDto> &sessions); //把批次列表渲染到主界面树
     void showUploadProgressDialog(); //显示上传进度条
     void showMyUploadDialog(); //显示“我的上传”UI
     void setCircularAvatar(const QPixmap &pixmap); //设置圆形头像private:

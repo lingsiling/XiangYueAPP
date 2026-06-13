@@ -56,27 +56,36 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
 
     // 接收服务端批次列表更新（新协议）
     connect(fileClient, &FileClient::sessionsUpdated, this, [=](const QVector<SessionDto> &sessions){
-        ui->treeWidgetResources->clear();
-        for (const auto &s : sessions) {
-            auto *item = new QTreeWidgetItem();
-            item->setText(0, s.title.isEmpty() ? "(无名称)" : s.title);
+        // 保存全量数据，渲染到界面，并用标签重建搜索索引
+        m_allSessions = sessions;
+        renderSessions(m_allSessions);
 
-            item->setText(1, QString::number(s.fileCount));
-            item->setText(2, s.createdAt);
-
-            item->setData(0, Qt::UserRole, s.id);
-            // 用 "||" 作为字段分隔符（避免与 tags 内部 "|" 冲突）
-            item->setData(0, Qt::UserRole + 1,
-                QString("%1||%2||%3||%4").arg(s.id).arg(s.title).arg(s.tags).arg(s.description));
-
-            ui->treeWidgetResources->addTopLevelItem(item);
-        }
+        QVector<QPair<qint64, QString>> items;
+        items.reserve(sessions.size());
+        for (const auto &s : sessions)
+            items.push_back({s.id, s.tags});
+        m_tagSearch.build(items);
     });
 
-    //搜索按钮
+    //搜索按钮：按标签做 HNSW 近似检索，结果直接刷新到主界面
     connect(ui->buttonSearch, &QPushButton::clicked, this, [=](){
-        QString key = ui->searchline->text();
-        refreshList(m_search.filter(key));
+        const QString key = ui->searchline->text().trimmed();
+        if (key.isEmpty()) {
+            // 查询为空 → 显示全部
+            renderSessions(m_allSessions);
+            return;
+        }
+
+        // 取得按相似度排序的资源 id，再按该顺序从全量数据中过滤出子集
+        const QList<qint64> ids = m_tagSearch.search(key);
+        QVector<SessionDto> matched;
+        matched.reserve(ids.size());
+        for (qint64 id : ids) {
+            for (const auto &s : m_allSessions) {
+                if (s.id == id) { matched.push_back(s); break; }
+            }
+        }
+        renderSessions(matched);
     });
 
     // 我的收藏按钮：只负责弹出收藏 UI，不直接耦合收藏数据源
@@ -129,16 +138,22 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
     });
 }
 
-void MainWindow::refreshList(const QStringList &list)
+void MainWindow::renderSessions(const QVector<SessionDto> &sessions)
 {
     ui->treeWidgetResources->clear();
-    //每行显示文件名
-    for (const QString &fileName : list) {
-        if (!fileName.isEmpty()) {
-            auto *item = new QTreeWidgetItem();
-            item->setText(0, fileName);
-            ui->treeWidgetResources->addTopLevelItem(item);
-        }
+    for (const auto &s : sessions) {
+        auto *item = new QTreeWidgetItem();
+        item->setText(0, s.title.isEmpty() ? "(无名称)" : s.title);
+        item->setText(1, QString::number(s.fileCount));
+        item->setText(2, s.createdAt);
+
+        item->setData(0, Qt::UserRole, s.id);
+        // 用 "||" 作为字段分隔符（避免与 tags 内部 "|" 冲突）；
+        // 双击进详情页依赖此载荷，搜索结果同样保留，保证双击可用
+        item->setData(0, Qt::UserRole + 1,
+            QString("%1||%2||%3||%4").arg(s.id).arg(s.title).arg(s.tags).arg(s.description));
+
+        ui->treeWidgetResources->addTopLevelItem(item);
     }
 }
 
