@@ -16,7 +16,7 @@
 
 ### 服务端
 
-![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-33-01.png)
+![](READMEIMAGES\PixPin_2026-06-15_21-33-01.png)
 
 
 
@@ -24,7 +24,7 @@
 
 登录界面
 
-![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-34-10.png)
+![](READMEIMAGES\PixPin_2026-06-15_21-34-10.png)
 
 
 
@@ -32,20 +32,20 @@
 
 主界面
 
-![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-34-55.png)
+![](READMEIMAGES\PixPin_2026-06-15_21-34-55.png)
 
 上传资源详情界面
 
-![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-35-49.png)
+![](READMEIMAGES\PixPin_2026-06-15_21-35-49.png)
 
 资源详情界面
 
-![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-36-31.png)
+![](READMEIMAGES\PixPin_2026-06-15_21-36-31.png)
 
 我的上传界面
 
-![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-36-57.png)
+![](READMEIMAGES\PixPin_2026-06-15_21-36-57.png)
 
 我的收藏界面
 
-![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-37-06.png)
+![](READMEIMAGES\PixPin_2026-06-15_21-37-06.png)
