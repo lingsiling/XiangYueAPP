@@ -56,9 +56,9 @@ FavoritesDialog QPushButton:pressed {
 }
 
 /* ============================================
-   列表组件样式
+   列表组件样式（QTreeWidget，与“我的上传”/主界面资源列表保持一致）
    ============================================ */
-FavoritesDialog QListWidget {
+FavoritesDialog QTreeWidget {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
@@ -66,18 +66,26 @@ FavoritesDialog QListWidget {
     color: white;
 }
 
-FavoritesDialog QListWidget::item {
+/* item 不能设 margin：多列时每个单元格各自留白，会把整行高亮裂成多块。
+   选中/悬停只改背景、不加逐格 border，保证整行高亮连成一整块。 */
+FavoritesDialog QTreeWidget::item {
     padding: 8px;
-    margin: 2px;
+    border: none;
 }
 
-FavoritesDialog QListWidget::item:hover {
+FavoritesDialog QTreeWidget::item:hover {
     background: rgba(255, 255, 255, 0.15);
 }
 
-FavoritesDialog QListWidget::item:selected {
+FavoritesDialog QTreeWidget::item:selected {
     background: rgba(255, 216, 155, 0.3);
-    border: 1px solid rgba(255, 216, 155, 0.5);
+}
+
+FavoritesDialog QHeaderView::section {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    padding: 5px;
+    border: none;
 }
 
 /* ============================================

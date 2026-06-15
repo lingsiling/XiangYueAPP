@@ -153,16 +153,17 @@ bool DBManager::initSchema()
     )SQL", "create uploads")) return false;
 
     // ---------- 5. 收藏表 ----------
-    // is_active: 1=已收藏 0=已取消(软删除)
+    // 收藏作用在“上传批次(session)”粒度上：一条记录 = 某用户收藏了某个批次。
+    // session_id 关联 upload_sessions.id；is_active: 1=已收藏 0=已取消(软删除)。
     if (!execOrLog(R"SQL(
         CREATE TABLE IF NOT EXISTS favorites (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL,
-            resource_id INTEGER NOT NULL,
+            session_id  INTEGER NOT NULL,
             is_active   INTEGER DEFAULT 1,
             created_at  TEXT    DEFAULT CURRENT_TIMESTAMP,
             updated_at  TEXT    DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, resource_id)
+            UNIQUE(user_id, session_id)
         );
     )SQL", "create favorites")) return false;
 

@@ -164,9 +164,9 @@ void FileClient::tryProcessLines()
         }
         else if (line.startsWith("ADD_FAVORITE_OK##"))
         {
-            // 收藏成功：解析资源名，通知 UI
-            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1, 1));
-            emit addFavoriteOk(resourceName);
+            // 收藏成功：解析批次ID，通知 UI
+            const qint64 sessionId = QString::fromUtf8(line).section("##", 1, 1).trimmed().toLongLong();
+            emit addFavoriteOk(sessionId);
         }
         else if (line.startsWith("ADD_FAVORITE_FAIL##"))
         {
@@ -174,25 +174,23 @@ void FileClient::tryProcessLines()
             const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
             emit addFavoriteFail(reason);
         }
-        else if (line.startsWith("GET_FAVORITES_OK##"))
+        else if (line.startsWith("FAVORITES_BEGIN##"))
         {
-            // 获取收藏列表成功：用 || 分隔多个资源名，通知 UI 刷新
-            const QString favoritesData = fromB64(QString::fromUtf8(line).section("##", 1, 1));
-            const QStringList favorites = favoritesData.split("||", Qt::SkipEmptyParts);
-            emit favoritesUpdated(favorites);
+            handleFavoritesBegin(line);
         }
-        else if (line.startsWith("GET_FAVORITES_FAIL##"))
+        else if (line.startsWith("FAVORITES_ITEM##"))
         {
-            // 获取收藏列表失败：返回空列表，避免 UI 卡死
-            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
-            qWarning() << "[FileClient] 获取收藏列表失败:" << reason;
-            emit favoritesUpdated(QStringList());
+            handleFavoritesItem(line);
+        }
+        else if (line.startsWith("FAVORITES_END##"))
+        {
+            handleFavoritesEnd(line);
         }
         else if (line.startsWith("REMOVE_FAVORITE_OK##"))
         {
-            // 取消收藏成功：解析资源名，通知 UI 更新按钮状态
-            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1, 1));
-            emit removeFavoriteOk(resourceName);
+            // 取消收藏成功：解析批次ID，通知 UI 更新按钮状态
+            const qint64 sessionId = QString::fromUtf8(line).section("##", 1, 1).trimmed().toLongLong();
+            emit removeFavoriteOk(sessionId);
         }
         else if (line.startsWith("REMOVE_FAVORITE_FAIL##"))
         {
@@ -202,10 +200,10 @@ void FileClient::tryProcessLines()
         }
         else if (line.startsWith("CHECK_FAVORITE_OK##"))
         {
-            // 检查收藏状态返回：格式为 CHECK_FAVORITE_OK##资源名_b64##状态(0/1)\n
-            const QString resourceName = fromB64(QString::fromUtf8(line).section("##", 1, 1));
+            // 检查收藏状态返回：格式为 CHECK_FAVORITE_OK##sessionId##状态(0/1)\n
+            const qint64 sessionId = QString::fromUtf8(line).section("##", 1, 1).trimmed().toLongLong();
             const int isFavorited = QString::fromUtf8(line).section("##", 2, 2).toInt();
-            emit checkFavoriteOk(resourceName, isFavorited == 1);
+            emit checkFavoriteOk(sessionId, isFavorited == 1);
         }
         else
         {
@@ -381,46 +379,43 @@ void FileClient::deleteMyUploadSession(qint64 sessionId)
     tcpSocket->write(cmd.toUtf8());
 }
 
-// 发送收藏请求：客户端 UI 调用的入口，不关心协议细节
-void FileClient::addFavorite(const QString &resourceName)
+// 发送收藏请求：客户端 UI 调用的入口，不关心协议细节（按批次ID收藏）
+void FileClient::addFavorite(qint64 sessionId)
 {
-    const QString name = resourceName.trimmed();
-    if (name.isEmpty()) return;
+    if (sessionId <= 0) return;
 
-    // 行协议：ADD_FAVORITE##resourceName_b64
-    const QString cmd = QString("ADD_FAVORITE##%1\n").arg(toB64(name));
+    // 行协议：ADD_FAVORITE##sessionId
+    const QString cmd = QString("ADD_FAVORITE##%1\n").arg(sessionId);
     tcpSocket->write(cmd.toUtf8());
 }
 
-// 请求收藏列表：服务端返回所有 is_active = 1 的收藏资源
+// 请求收藏列表：服务端返回当前用户已收藏的全部批次（FAVORITES_BEGIN/ITEM/END）
 void FileClient::getFavorites(qint64 userId)
 {
     if (userId <= 0) return;
 
-    // 行协议：GET_FAVORITES##
+    // 行协议：GET_FAVORITES##（服务端用登录态识别当前用户）
     const QString cmd = QString("GET_FAVORITES##\n");
     tcpSocket->write(cmd.toUtf8());
 }
 
 // 发送取消收藏请求：软删除，服务端只更新 is_active = 0
-void FileClient::removeFavorite(const QString &resourceName)
+void FileClient::removeFavorite(qint64 sessionId)
 {
-    const QString name = resourceName.trimmed();
-    if (name.isEmpty()) return;
+    if (sessionId <= 0) return;
 
-    // 行协议：REMOVE_FAVORITE##resourceName_b64
-    const QString cmd = QString("REMOVE_FAVORITE##%1\n").arg(toB64(name));
+    // 行协议：REMOVE_FAVORITE##sessionId
+    const QString cmd = QString("REMOVE_FAVORITE##%1\n").arg(sessionId);
     tcpSocket->write(cmd.toUtf8());
 }
 
-// 查询指定资源的收藏状态：打开详情页时调用，用于初始化按钮文字
-void FileClient::checkFavorite(const QString &resourceName)
+// 查询指定批次的收藏状态：打开详情页时调用，用于初始化按钮文字
+void FileClient::checkFavorite(qint64 sessionId)
 {
-    const QString name = resourceName.trimmed();
-    if (name.isEmpty()) return;
+    if (sessionId <= 0) return;
 
-    // 行协议：CHECK_FAVORITE##resourceName_b64
-    const QString cmd = QString("CHECK_FAVORITE##%1\n").arg(toB64(name));
+    // 行协议：CHECK_FAVORITE##sessionId
+    const QString cmd = QString("CHECK_FAVORITE##%1\n").arg(sessionId);
     tcpSocket->write(cmd.toUtf8());
 }
 
@@ -469,6 +464,45 @@ void FileClient::handleMyUploadsEnd(const QByteArray &line)
 
     m_myUploadsUserId = 0;
     m_pendingMyUploads.clear();
+}
+
+// ====== 我的收藏列表解析（与"我的上传"完全同构，复用 SessionDto） ======
+void FileClient::handleFavoritesBegin(const QByteArray &line)
+{
+    // FAVORITES_BEGIN##userId
+    m_favoritesUserId = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+    m_pendingFavorites.clear();
+}
+
+void FileClient::handleFavoritesItem(const QByteArray &line)
+{
+    // FAVORITES_ITEM##id##userId##title_b64##tags_b64##desc_b64##fileCount##createdAt_b64
+    // 字段顺序与 MY_UPLOADS_ITEM / SESSION_ITEM 完全一致
+    const QString s = QString::fromUtf8(line);
+
+    SessionDto item;
+    item.id          = s.section("##", 1, 1).toLongLong();
+    item.userId      = s.section("##", 2, 2).toLongLong();
+    item.title       = fromB64(s.section("##", 3, 3));
+    item.tags        = fromB64(s.section("##", 4, 4));
+    item.description = fromB64(s.section("##", 5, 5));
+    item.fileCount   = s.section("##", 6, 6).toInt();
+    item.createdAt   = fromB64(s.section("##", 7, 7));
+    m_pendingFavorites.push_back(item);
+}
+
+void FileClient::handleFavoritesEnd(const QByteArray &line)
+{
+    // FAVORITES_END##userId
+    const qint64 uid = QString::fromUtf8(line).section("##", 1, 1).toLongLong();
+
+    //只在同一批次结束时发信号，避免污染其他请求
+    if (uid == m_favoritesUserId) {
+        emit favoritesUpdated(uid, m_pendingFavorites);
+    }
+
+    m_favoritesUserId = 0;
+    m_pendingFavorites.clear();
 }
 
 // ====== 批次上传：一次上传包含多个文件 + 标签 + 介绍 ======

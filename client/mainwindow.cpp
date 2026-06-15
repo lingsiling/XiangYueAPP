@@ -88,15 +88,17 @@ MainWindow::MainWindow(QWidget *parent,QTcpSocket *socket)
         renderSessions(matched);
     });
 
-    // 我的收藏按钮：只负责弹出收藏 UI，不直接耦合收藏数据源
+    // 刷新按钮：重新向服务端拉取最新的资源批次列表
+    // 和 HNSW 搜索索引重建都交给已有的 sessionsUpdated 信号槽链路完成
+    connect(ui->buttonRefresh, &QPushButton::clicked, this, [=]() {
+        ui->searchline->clear();// 清空搜索框：刷新后默认展示全部资源，避免出现“列表已是全量，但搜索框仍残留旧关键词”这种界面不一致的情况
+        fileClient->requestAllSessions();// 向服务端发送 LIST_SESSIONS 请求；服务端返回后会触发 sessionsUpdated，自动更新 m_allSessions、重绘 treeWidgetResources 并重建标签索引
+        ui->textEdit->append("正在刷新资源列表…");
+    });
+
+    // 我的收藏按钮：只负责弹出收藏 UI，数据加载/刷新由 FavoritesDialog 自行向 FileClient 请求
     connect(ui->buttonFavorite, &QPushButton::clicked, this, [this]() {
         FavoritesDialog dlg(this, fileClient, m_session.userId);
-
-        // 刷新按钮点击后，先把信号抛出去，后续再按你的收藏模块接入数据刷新
-        connect(&dlg, &FavoritesDialog::refreshRequested, this, [this]() {
-            ui->textEdit->append("收藏列表刷新按钮已点击");
-        });
-
         dlg.exec();
     });
 

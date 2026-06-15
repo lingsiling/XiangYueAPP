@@ -203,7 +203,14 @@ UploadService::DeleteSessionResult UploadService::deleteSession(const QString &s
         return r;
     }
 
-    // 4a. 逐个删除文件对应的 resources 行（deleteByFileName 内部已级联删 favorites）
+    // 4a. 清理该批次的全部收藏记录（收藏按 session 粒度，整批硬删除）
+    if (!m_favoritesRepo.removeBySessionId(sessionId)) {
+        db.rollback();
+        r.reason = "FAVORITE_DELETE_FAIL";
+        return r;
+    }
+
+    // 4b. 逐个删除文件对应的 resources 行
     for (const ResourceRecord &rec : files) {
         if (!m_resourceRepo.deleteByFileName(rec.filename)) {
             db.rollback();
@@ -212,14 +219,14 @@ UploadService::DeleteSessionResult UploadService::deleteSession(const QString &s
         }
     }
 
-    // 4b. 删除该批次在 uploads 表中的全部关联记录
+    // 4c. 删除该批次在 uploads 表中的全部关联记录
     if (!m_repo.deleteUploadsBySessionId(sessionId)) {
         db.rollback();
         r.reason = "UPLOAD_DELETE_FAIL";
         return r;
     }
 
-    // 4c. 删除批次记录本身
+    // 4d. 删除批次记录本身
     if (!m_repo.deleteSessionRow(sessionId)) {
         db.rollback();
         r.reason = "SESSION_DELETE_FAIL";

@@ -140,49 +140,19 @@ bool ResourceRepository::upsert(const QString &filename, const QString &serverPa
 
 bool ResourceRepository::deleteByFileName(const QString &filename)
 {
-    // 文件从磁盘移除后，同步删除数据库记录，保持文件系统和资源表一致
-    auto conn = DBConnectionPool::instance().connection();
-    QSqlQuery q(conn);
-    
-    // 第一步：查询该资源的 ID
-    q.prepare("SELECT id FROM resources WHERE filename = ?");
+    // 文件从磁盘移除后，同步删除数据库记录，保持文件系统和资源表一致。
+    // 注意：收藏(favorites)已改为按“批次(session)”粒度存储，与单个 resource 无关，
+    //       因此这里不再级联删除收藏；批次的收藏清理由 UploadService::deleteSession 统一负责。
+    QSqlQuery q(DBConnectionPool::instance().connection());
+    q.prepare("DELETE FROM resources WHERE filename = ?");
     q.addBindValue(filename.trimmed());
-    
+
     if (!q.exec()) {
-        qDebug() << "[ResourceRepo] 查询资源失败:" << q.lastError().text();
-        return false;
-    }
-    
-    if (!q.next()) {
-        // 资源不存在
-        qDebug() << "[ResourceRepo] 资源不存在:" << filename;
-        return false;
-    }
-    
-    qint64 resourceId = q.value(0).toLongLong();
-    
-    // 第二步：删除相关的收藏记录（级联删除，保持数据一致性）
-    QSqlQuery delFavorites(conn);
-    delFavorites.prepare("DELETE FROM favorites WHERE resource_id = ?");
-    delFavorites.addBindValue(resourceId);
-    
-    if (!delFavorites.exec()) {
-        qDebug() << "[ResourceRepo] 删除收藏记录失败:" << delFavorites.lastError().text();
-        return false;
-    }
-    
-    qDebug() << "[ResourceRepo] 删除了 " << delFavorites.numRowsAffected() << " 条收藏记录";
-    
-    // 第三步：删除资源记录
-    QSqlQuery delResource(conn);
-    delResource.prepare("DELETE FROM resources WHERE id = ?");
-    delResource.addBindValue(resourceId);
-    
-    if (!delResource.exec()) {
-        qDebug() << "[ResourceRepo] 删除资源失败:" << delResource.lastError().text();
+        qDebug() << "[ResourceRepo] deleteByFileName failed:" << q.lastError().text();
         return false;
     }
 
-    qDebug() << "[ResourceRepo] 资源及其相关收藏已删除:" << filename;
+    qDebug() << "[ResourceRepo] 资源已删除:" << filename
+             << "(受影响" << q.numRowsAffected() << "行)";
     return true;
 }

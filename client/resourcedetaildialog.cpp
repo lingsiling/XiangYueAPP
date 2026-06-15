@@ -72,6 +72,10 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
             this, &ResourceDetailDialog::onDownloadAll);
     connect(ui->buttonComment, &QPushButton::clicked,
             this, &ResourceDetailDialog::on_buttonComment_clicked);
+    // 收藏按钮：on_buttonFavorite_clicked 并非真正的 Qt slot，connectSlotsByName 不会自动连接，
+    // 必须在此显式绑定，否则点击收藏无任何反应
+    connect(ui->buttonFavorite, &QPushButton::clicked,
+            this, &ResourceDetailDialog::on_buttonFavorite_clicked);
 
     if (!m_fileClient) return;
 
@@ -172,32 +176,32 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     connect(ui->listWidgetComments, &QListWidget::customContextMenuRequested,
             this, &ResourceDetailDialog::onCommentContextMenu);
 
-    // 收藏功能 — 添加 / 取消 / 状态检查
+    // 收藏功能 — 添加 / 取消 / 状态检查（均以批次ID m_sessionId 为准）
     connect(m_fileClient, &FileClient::addFavoriteOk, this,
-        [=](const QString &rn) {
-            if (rn == m_resourceName) { m_isFavorited = true; ui->buttonFavorite->setText("已收藏"); }
+        [=](qint64 sid) {
+            if (sid == m_sessionId) { m_isFavorited = true; ui->buttonFavorite->setText("取消收藏"); }
         });
     connect(m_fileClient, &FileClient::addFavoriteFail, this,
         [=](const QString &reason) {
             if (reason != "ALREADY_FAVORITED") QMessageBox::warning(this, "收藏失败", reason);
         });
     connect(m_fileClient, &FileClient::removeFavoriteOk, this,
-        [=](const QString &rn) {
-            if (rn == m_resourceName) { m_isFavorited = false; ui->buttonFavorite->setText("收藏"); }
+        [=](qint64 sid) {
+            if (sid == m_sessionId) { m_isFavorited = false; ui->buttonFavorite->setText("收藏"); }
         });
     connect(m_fileClient, &FileClient::removeFavoriteFail, this,
         [=](const QString &reason) { QMessageBox::warning(this, "取消收藏失败", reason); });
     connect(m_fileClient, &FileClient::checkFavoriteOk, this,
-        [=](const QString &rn, bool fav) {
-            if (rn == m_resourceName) {
+        [=](qint64 sid, bool fav) {
+            if (sid == m_sessionId) {
                 m_isFavorited = fav;
-                ui->buttonFavorite->setText(fav ? "已收藏" : "收藏");
+                ui->buttonFavorite->setText(fav ? "取消收藏" : "收藏");
             }
         });
 
     //打开时自动拉取历史评论和收藏状态
     m_fileClient->requestComments(m_resourceName);
-    if (m_userId > 0) m_fileClient->checkFavorite(m_resourceName);
+    if (m_userId > 0 && m_sessionId > 0) m_fileClient->checkFavorite(m_sessionId);
 }
 
 
@@ -229,11 +233,14 @@ void ResourceDetailDialog::on_buttonFavorite_clicked()
 {
     if (!m_fileClient) { QMessageBox::warning(this, "错误", "收藏模块未初始化"); return; }
     if (m_userId <= 0)  { QMessageBox::warning(this, "错误", "未登录，无法收藏"); return; }
+    if (m_sessionId <= 0) { QMessageBox::warning(this, "错误", "无效的资源批次"); return; }
 
+    // 按当前状态切换：已收藏→取消收藏；未收藏→收藏。
+    // 按钮文字与 m_isFavorited 的最终更新交给 removeFavoriteOk / addFavoriteOk 回调，保证以服务端结果为准
     if (m_isFavorited)
-        m_fileClient->removeFavorite(m_resourceName);
+        m_fileClient->removeFavorite(m_sessionId);
     else
-        m_fileClient->addFavorite(m_resourceName);
+        m_fileClient->addFavorite(m_sessionId);
 }
 
 //  下载全部

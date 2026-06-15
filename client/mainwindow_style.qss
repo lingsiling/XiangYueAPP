@@ -58,6 +58,7 @@ MainWindow QLabel#username {
    按钮样式（导航菜单）
    ============================================ */
 MainWindow QPushButton#buttonFavorite,
+MainWindow QPushButton#buttonRefresh,
 MainWindow QPushButton#buttonMyUpload,
 MainWindow QPushButton#buttonUpload,
 MainWindow QPushButton#buttonSet,
@@ -74,6 +75,7 @@ MainWindow QPushButton#buttonBackToMain {
 }
 
 MainWindow QPushButton#buttonFavorite:hover,
+MainWindow QPushButton#buttonRefresh:hover,
 MainWindow QPushButton#buttonMyUpload:hover,
 MainWindow QPushButton#buttonUpload:hover,
 MainWindow QPushButton#buttonSet:hover,
@@ -83,6 +85,7 @@ MainWindow QPushButton#buttonBackToMain:hover {
 }
 
 MainWindow QPushButton#buttonFavorite:pressed,
+MainWindow QPushButton#buttonRefresh:pressed,
 MainWindow QPushButton#buttonMyUpload:pressed,
 MainWindow QPushButton#buttonUpload:pressed,
 MainWindow QPushButton#buttonSet:pressed,

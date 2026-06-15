@@ -91,17 +91,17 @@ public:
     //我的上传删除：只传批次ID，由服务端在一个事务里清理整批文件/记录
     void deleteMyUploadSession(qint64 sessionId);
 
-    //收藏功能：添加收藏（收藏/取消收藏的入口之一）
-    void addFavorite(const QString &resourceName);
-    
-    // 请求收藏列表：获取当前用户所有已收藏的资源名
+    //收藏功能（粒度 = 上传批次 session）：收藏某个批次
+    void addFavorite(qint64 sessionId);
+
+    // 请求收藏列表：获取当前用户已收藏的全部批次
     void getFavorites(qint64 userId);
 
-    // 取消收藏：将指定资源从收藏列表中移除（软删除）
-    void removeFavorite(const QString &resourceName);
+    // 取消收藏：将指定批次从收藏列表中移除（软删除）
+    void removeFavorite(qint64 sessionId);
 
-    // 检查收藏状态：查询某资源是否已被当前用户收藏，用于初始化按钮
-    void checkFavorite(const QString &resourceName);
+    // 检查收藏状态：查询某批次是否已被当前用户收藏，用于初始化按钮
+    void checkFavorite(qint64 sessionId);
 
 private:
     //接收缓冲区：解决TCP粘包/拆包（命令行、FILE头）
@@ -124,6 +124,10 @@ private:
     //我的上传解析缓存（BEGIN -> ITEM... -> END），现按"批次"组织，复用 SessionDto
     qint64 m_myUploadsUserId = 0;
     QVector<SessionDto> m_pendingMyUploads;
+
+    //我的收藏解析缓存（FAVORITES_BEGIN -> ITEM... -> END），同样按"批次"组织
+    qint64 m_favoritesUserId = 0;
+    QVector<SessionDto> m_pendingFavorites;
 
     //批次列表解析缓存
     QVector<SessionDto> m_pendingSessions;
@@ -148,6 +152,11 @@ private:
     void handleMyUploadsBegin(const QByteArray &line);
     void handleMyUploadsItem(const QByteArray &line);
     void handleMyUploadsEnd(const QByteArray &line);
+
+    // 我的收藏行解析（BEGIN/ITEM/END，字段顺序与"我的上传"一致，复用 SessionDto）
+    void handleFavoritesBegin(const QByteArray &line);
+    void handleFavoritesItem(const QByteArray &line);
+    void handleFavoritesEnd(const QByteArray &line);
 
     // 批次列表解析
     void handleSessionsBegin(const QByteArray &line);
@@ -192,16 +201,16 @@ signals:
 
     //"我的上传"列表刷新结果（按批次返回，复用 SessionDto）
     void myUploadsUpdated(qint64 userId, const QVector<SessionDto> &items);
-    //收藏操作结果：成功时返回资源名，UI 据此更新按钮状态
-    void addFavoriteOk(const QString &resourceName);
+    //收藏操作结果：成功时返回批次ID，UI 据此更新按钮状态
+    void addFavoriteOk(qint64 sessionId);
     void addFavoriteFail(const QString &reason);
-    // 收藏列表刷新结果：打开收藏对话框时触发
-    void favoritesUpdated(const QStringList &favorites);
-    // 取消收藏结果：成功时返回资源名，UI 据此切换按钮文字
-    void removeFavoriteOk(const QString &resourceName);
+    // 收藏列表刷新结果：按"批次"返回（复用 SessionDto），打开收藏对话框时触发
+    void favoritesUpdated(qint64 userId, const QVector<SessionDto> &items);
+    // 取消收藏结果：成功时返回批次ID，UI 据此切换按钮文字
+    void removeFavoriteOk(qint64 sessionId);
     void removeFavoriteFail(const QString &reason);
-    // 检查收藏结果：打开资源详情时触发，用于初始化"收藏/已收藏"按钮
-    void checkFavoriteOk(const QString &resourceName, bool isFavorited);
+    // 检查收藏结果：打开资源详情时触发，用于初始化"收藏/取消收藏"按钮
+    void checkFavoriteOk(qint64 sessionId, bool isFavorited);
     //统一日志出口：UI 只负责显示（低耦合）
     void logLine(const QString &line);
 

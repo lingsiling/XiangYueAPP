@@ -3,6 +3,7 @@
 
 #include "resourcerepository.h"
 #include "uploadrepository.h"
+#include "favoritesrepository.h"
 
 #include <QString>
 #include <QStringList>
@@ -61,6 +62,7 @@ public:
 private:
     ResourceRepository m_resourceRepo;
     UploadRepository m_repo;
+    FavoritesRepository m_favoritesRepo;   // 删除批次时级联清理该批次的收藏记录
 };
 
 #endif // UPLOADSERVICE_H
