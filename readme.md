@@ -1,21 +1,51 @@
-- # 享阅（XiangYueAPP / XiangYueServer）
+# 享阅（XiangYueAPP）
 
-  **学习资源共享平台** - 基于 Qt Widgets + TCP 的高并发网络应用示例
+## (Client / XiangYueServer）
 
-  **关键特性**：支持 **并发连接**、**多文件上传**、**资源评论系统**、**实时传输进度条**
+**学习资源共享平台** - 基于 Qt Widgets + TCP 的高并发网络应用示例
 
-  服务端
+**关键特性**：支持 **并发连接**、**多文件资源上传**、**资源评论系统**、**文件预览**、**标签搜索（HNSW）**
 
-![image-20260524154451969](C:\Users\Sivier\AppData\Roaming\Typora\typora-user-images\image-20260524154451969.png)
+使用**Qt6.10.3**(以防无法使用PDF预览模块)
 
-客户端
+该服务端可在Windows和Linux上运行
 
-![image-20260524154535660](C:\Users\Sivier\AppData\Roaming\Typora\typora-user-images\image-20260524154535660.png)
+如果要打包客户端记得修改logdialog.cpp中connectToHost后的IP
 
-![image-20260524154603326](C:\Users\Sivier\AppData\Roaming\Typora\typora-user-images\image-20260524154603326.png)
 
-![image-20260524154621695](C:\Users\Sivier\AppData\Roaming\Typora\typora-user-images\image-20260524154621695.png)
 
-![image-20260524154636486](C:\Users\Sivier\AppData\Roaming\Typora\typora-user-images\image-20260524154636486.png)
+### 服务端
 
-![image-20260524154724274](C:\Users\Sivier\AppData\Roaming\Typora\typora-user-images\image-20260524154724274.png)
+![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-33-01.png)
+
+
+
+### 客户端
+
+登录界面
+
+![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-34-10.png)
+
+
+
+
+
+主界面
+
+![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-34-55.png)
+
+上传资源详情界面
+
+![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-35-49.png)
+
+资源详情界面
+
+![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-36-31.png)
+
+我的上传界面
+
+![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-36-57.png)
+
+我的收藏界面
+
+![](C:\Users\Sivier\Pictures\pixpin\PixPin_2026-06-15_21-37-06.png)

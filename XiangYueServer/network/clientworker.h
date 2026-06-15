@@ -56,11 +56,15 @@ private:
     void consumeUploadData();        // 接收文件二进制数据
     void startReceivingFile(const QString &line);  // 解析文件上传头
     void sendFileList();
-    void sendFile(const QString &fileName);
+    // 发送一个文件给客户端。forPreview=false 走下载（头 FILE##/FILE_FAIL##），
+    // forPreview=true 走预览（头 PREVIEW_FILE##/PREVIEW_FAIL##）。
+    // 两者查找/打开/分块发送逻辑完全一致，仅响应头关键字不同，便于客户端区分"落盘下载"与"内存预览"。
+    void sendFile(const QString &fileName, bool forPreview = false);
 
     //命令分发（分为同步和异步两类）
     // 同步命令
     void handleDownloadCommand(const QString &line);
+    void handlePreviewCommand(const QString &fileName);   // 预览：把文件流给客户端（客户端存内存、不落盘）
     void handleListSessionsCommand();                     // 新：返回批次列表
     void handleSessionFilesCommand(const QString &line);  // 新：返回某批次的文件列表
 

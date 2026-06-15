@@ -18,21 +18,29 @@ FileClient::FileClient(QTcpSocket *socket,MainWindow *ui)
         //缓冲区+调度
         m_buf += tcpSocket->readAll();
 
-        //正在下载：优先把缓冲区当二进制文件内容消费
+        //正在下载：优先把缓冲区当二进制文件内容消费（写盘）
         if(!isDownloadStart)
         {
             consumeDownloadData();
             if(!isDownloadStart) return; //别按行解析（避免二进制里出现 '\n'）
         }
 
-        //不在下载状态：按行分发 LIST / FILE头 / 以后留言等
+        //正在预览接收：把缓冲区当预览二进制消费（入内存、不写盘）。
+        //预览与下载互斥：单 socket、服务端按请求顺序串行响应，同一时刻至多一种二进制在途。
+        if(m_previewReceiving)
+        {
+            consumePreviewData();
+            if(m_previewReceiving) return;
+        }
+
+        //不在二进制接收状态：按行分发 LIST / FILE头 / PREVIEW_FILE头 / 评论等
         tryProcessLines();
 
-        //可能刚解析到 FILE 头，进入下载状态，缓冲区里已经粘了文件内容 -> 立即消费一次
+        //可能刚解析到 FILE / PREVIEW_FILE 头进入接收态，缓冲区已粘有二进制 -> 立即消费一次
         if(!isDownloadStart)
-        {
             consumeDownloadData();
-        }
+        else if(m_previewReceiving)
+            consumePreviewData();
     });
 }
 
@@ -58,6 +66,28 @@ void FileClient::tryProcessLines()
 
             //进入下载状态后就退出，让 onReadyRead() 去消费二进制内容
             if(!isDownloadStart) return;
+        }
+        else if(line.startsWith("PREVIEW_FILE##"))
+        {
+            // PREVIEW_FILE##name##size —— 预览数据头，后跟二进制；存入内存而非写盘。
+            const QString s = QString::fromUtf8(line);
+            m_previewName = s.section("##", 1, 1).trimmed();
+            m_previewSize = s.section("##", 2, 2).toLongLong();
+            m_previewRecv = 0;
+            m_previewBuf.clear();
+            m_previewReceiving = true;
+            return;  // 退出行解析，把后续二进制内容交给 consumePreviewData
+        }
+        else if(line.startsWith("PREVIEW_FAIL##"))
+        {
+            // PREVIEW_FAIL##reason —— 预览失败（文件不存在/打开失败）。
+            // 用请求时记录的 m_previewName 回报是哪个文件失败，并清空预览状态，避免遗留孤儿态。
+            const QString reason = QString::fromUtf8(line).section("##", 1).trimmed();
+            emit previewFailed(m_previewName, reason);
+            m_previewName.clear();
+            m_previewSize = 0;
+            m_previewRecv = 0;
+            m_previewBuf.clear();
         }
         else if (line.startsWith("BATCH_OK##"))
         {
@@ -248,10 +278,58 @@ void FileClient::consumeDownloadData()
     }
 }
 
+//预览状态：按 m_previewSize 精确消费二进制，累积进内存缓冲（不写盘）。
+//与 consumeDownloadData 结构对称，区别仅在于"append 到 QByteArray"而非"write 到 QFile"。
+void FileClient::consumePreviewData()
+{
+    if(!m_previewReceiving) return;
+
+    qint64 need = m_previewSize - m_previewRecv;
+    qint64 canRead = qMin<qint64>(need, m_buf.size());
+    if(canRead > 0)
+    {
+        m_previewBuf.append(m_buf.constData(), canRead);
+        m_previewRecv += canRead;
+        m_buf.remove(0, canRead);
+    }
+
+    //收满（含 size==0 的退化情形）：结束接收态，把完整字节一次性交给 UI 渲染。
+    //先把要发出的数据复制到局部、再清空成员，避免槽函数里可能的重入导致状态错乱。
+    if(m_previewRecv >= m_previewSize)
+    {
+        m_previewReceiving = false;
+        const QString name = m_previewName;
+        const QByteArray data = m_previewBuf;
+
+        m_previewName.clear();
+        m_previewSize = 0;
+        m_previewRecv = 0;
+        m_previewBuf.clear();
+
+        emit previewDataReady(name, data);
+    }
+}
+
 //下载文件
 void FileClient::downloadFile(QString fileName)
 {
     QString cmd = "DOWNLOAD##" + fileName + "\n";
+    tcpSocket->write(cmd.toUtf8());
+}
+
+//请求预览：发送 PREVIEW## 命令（服务端回 PREVIEW_FILE##name##size + 二进制，存内存不落盘）。
+//先记录文件名：PREVIEW_FAIL 不带文件名字段，靠它回报是哪个文件失败。
+void FileClient::requestPreview(const QString &fileName)
+{
+    const QString fn = fileName.trimmed();
+    if (fn.isEmpty() || !tcpSocket) return;
+
+    m_previewName = fn;
+    m_previewSize = 0;
+    m_previewRecv = 0;
+    m_previewBuf.clear();
+
+    const QString cmd = "PREVIEW##" + fn + "\n";
     tcpSocket->write(cmd.toUtf8());
 }
 

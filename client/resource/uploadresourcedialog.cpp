@@ -1,6 +1,7 @@
 #include "uploadresourcedialog.h"
 #include "ui_uploadresourcedialog.h"
 #include "fileclient.h"
+#include "filepreviewdialog.h"   // 文件预览（独立、低耦合模块：只接收本地路径）
 
 #include <QFileDialog>
 #include <QFileInfo>
@@ -48,6 +49,12 @@ UploadResourceDialog::UploadResourceDialog(FileClient *fileClient, qint64 userId
     connect(ui->btnAddTag,       &QPushButton::clicked, this, &UploadResourceDialog::onAddTag);
     connect(ui->btnSubmit,       &QPushButton::clicked, this, &UploadResourceDialog::onSubmit);
     connect(ui->btnCancel,       &QPushButton::clicked, this, &QDialog::reject);
+    connect(ui->btnPreview,      &QPushButton::clicked, this, &UploadResourceDialog::onPreviewSelected);
+
+    // 双击文件行 → 直接预览（上传框未占用双击事件；双击会先选中该行，
+    // 故可直接复用 onPreviewSelected，对“当前选中项”做预览，零重复代码）
+    connect(ui->treeWidgetFiles, &QTreeWidget::itemDoubleClicked,
+            this, &UploadResourceDialog::onPreviewSelected);
 
     // 文件列表行数变更 → 自动更新统计标签
     connect(ui->treeWidgetFiles, &QTreeWidget::itemSelectionChanged, this, [this]() {
@@ -176,6 +183,30 @@ void UploadResourceDialog::onSubmit()
     }
 
     accept();
+}
+
+// ============================================================
+//  "预览"按钮 / 双击文件行：预览当前选中的文件
+//  上传界面的文件就在本地磁盘，直接把本地路径交给 FilePreviewDialog。
+//  仅支持图片与 PDF，其它类型由对话框内部给出友好提示。
+// ============================================================
+void UploadResourceDialog::onPreviewSelected()
+{
+    // 取当前选中行；未选中则取双击/单选的当前行
+    QTreeWidgetItem *item = ui->treeWidgetFiles->currentItem();
+    if (!item) {
+        const QList<QTreeWidgetItem *> sel = ui->treeWidgetFiles->selectedItems();
+        if (!sel.isEmpty()) item = sel.first();
+    }
+    if (!item) {
+        QMessageBox::information(this, "预览", "请先选择一个要预览的文件。");
+        return;
+    }
+
+    const QString path = item->data(0, Qt::UserRole).toString();  // addFileRow 存入的绝对路径
+    if (path.isEmpty()) return;
+
+    FilePreviewDialog::previewLocalFile(this, path);
 }
 
 // ============================================================

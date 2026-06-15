@@ -1,10 +1,10 @@
 <RCC>
     <qresource prefix="/qss">
-        <file>logdialog_style.qss</file>
-        <file>mainwindow_style.qss</file>
-        <file>favoritesdialog_style.qss</file>
-        <file>resourcedetaildialog_style.qss</file>
-        <file>myuploaddialog_style.qss</file>
-        <file>uploadresourcedialog_style.qss</file>
+        <file alias="logdialog_style.qss">login/logdialog_style.qss</file>
+        <file alias="mainwindow_style.qss">app/mainwindow_style.qss</file>
+        <file alias="favoritesdialog_style.qss">favorite/favoritesdialog_style.qss</file>
+        <file alias="resourcedetaildialog_style.qss">resource/resourcedetaildialog_style.qss</file>
+        <file alias="myuploaddialog_style.qss">resource/myuploaddialog_style.qss</file>
+        <file alias="uploadresourcedialog_style.qss">resource/uploadresourcedialog_style.qss</file>
     </qresource>
 </RCC>

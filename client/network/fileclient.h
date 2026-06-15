@@ -79,6 +79,10 @@ public:
     void requestSessionFiles(qint64 sessionId);         // 请求某批次的文件列表（点击后调用）
     void downloadFile(QString fileName);
 
+    // 预览：请求服务端把文件【流到客户端内存】（不落盘、不计入下载，与 downloadFile 完全独立）。
+    // 完成后发 previewDataReady(name, data)；失败发 previewFailed(name, reason)。
+    void requestPreview(const QString &fileName);
+
     //评论相关（UI 只调这些接口，不关心协议）
     void requestComments(const QString &resourceName);
     void addComment(qint64 userId, const QString &resourceName, const QString &content);
@@ -117,6 +121,13 @@ private:
     qint64 recvSize = 0;
     QFile file;
 
+    //预览相关（与下载独立的"内存接收"通道：只入内存、不写盘）
+    bool m_previewReceiving = false;   // 是否正在接收预览二进制
+    QString m_previewName;             // 预览文件名（请求时记录，供完成/失败回报）
+    qint64 m_previewSize = 0;          // 预览数据总字节（来自 PREVIEW_FILE 头）
+    qint64 m_previewRecv = 0;          // 已接收字节
+    QByteArray m_previewBuf;           // 预览数据累积缓冲（收满即一次性交给 UI 渲染）
+
     //评论解析缓存（BEGIN -> ITEM... -> END）
     QString m_commentResource;
     QVector<CommentDto> m_pendingComments;
@@ -144,6 +155,7 @@ private:
     void onReadyRead();          //readyRead 入口：只负责追加数据+调度
     void tryProcessLines();      //非下载状态：按 '\n' 拆行并分发
     void consumeDownloadData();  //下载状态：按 size 消费二进制
+    void consumePreviewData();   //预览状态：按 size 把二进制累积进内存（不写盘）
 
     // 评论行解析
     void handleCommentBegin(const QByteArray &line);
@@ -176,6 +188,11 @@ private:
 signals:
     void resourcesUpdated(const QStringList &list);  // 服务端文件列表更新时发出
     void fileReceived(const QString &fileName, const QString &localPath);  // 文件下载完成
+
+    // 预览数据就绪：文件已完整流入内存（不落盘），UI 直接用字节渲染（图片/PDF…）
+    void previewDataReady(const QString &fileName, const QByteArray &data);
+    // 预览失败：文件不存在 / 打开失败等
+    void previewFailed(const QString &fileName, const QString &reason);
 
     // 批次上传完成通知（sessionId = upload_sessions.id）
     void batchUploadFinished(qint64 sessionId);

@@ -156,3 +156,38 @@ MyUploadDialog QLineEdit:focus {
 MyUploadDialog QLineEdit::placeholder {
     color: rgba(255, 255, 255, 0.5);
 }
+
+/* ============================================
+   弹窗（QMessageBox）样式
+   对话框整体 QSS 会把 QWidget 背景设为透明、文字设为白色，
+   导致里面的删除确认框变成黑底白字。这里按更高优先级把弹窗
+   恢复成系统默认的白底黑字外观。
+   ============================================ */
+MyUploadDialog QMessageBox {
+    background: #ffffff;
+}
+
+MyUploadDialog QMessageBox QLabel {
+    color: #000000;
+    background: transparent;
+    font-size: 12px;
+}
+
+MyUploadDialog QMessageBox QPushButton {
+    background: #f0f0f0;
+    color: #000000;
+    border: 1px solid #c0c0c0;
+    border-radius: 4px;
+    padding: 5px 18px;
+    min-width: 64px;
+    font-weight: normal;
+}
+
+MyUploadDialog QMessageBox QPushButton:hover {
+    background: #e6e6e6;
+    border: 1px solid #adadad;
+}
+
+MyUploadDialog QMessageBox QPushButton:pressed {
+    background: #d4d4d4;
+}

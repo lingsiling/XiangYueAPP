@@ -1,16 +1,42 @@
 #include "resourcedetaildialog.h"
 #include "ui_resourcedetaildialog.h"
 #include "commentbubble.h"
+#include "filepreviewdialog.h"   // 文件预览（独立、低耦合模块：只接收本地路径）
 #include <QMessageBox>
 #include <QListWidget>
 #include <QMenu>
 #include <QAction>
 #include <QFile>
+#include <QFileInfo>
+#include <QTimer>
+#include <QStyledItemDelegate>
+#include <QStyleOptionViewItem>
+#include <QStyle>
 
 //  自定义数据角色：在 QListWidgetItem 中存储评论元信息
 //  避免从 item->text() 反向解析字符串
-static constexpr int ROLE_COMMENT_ID = Qt::UserRole;       // 评论ID
-static constexpr int ROLE_OWNER_UID  = Qt::UserRole + 1;   // 评论者ID
+static constexpr int ROLE_COMMENT_ID = Qt::UserRole;       // 评论ID（评论列表 listWidgetComments）
+static constexpr int ROLE_OWNER_UID  = Qt::UserRole + 1;   // 评论者ID（评论列表 listWidgetComments）
+
+// 文件列表单击时，Windows 原生样式会在单元格上画一圈黑色虚线焦点框，
+// QSS 的 outline:none 对它无效。该 delegate 在绘制前清除 State_HasFocus，
+// 既去掉黑框，又保留选中高亮与键盘导航（仅作用于设置了它的视图）。
+namespace {
+class NoFocusDelegate : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+protected:
+    void paint(QPainter *painter, const QStyleOptionViewItem &option,
+               const QModelIndex &index) const override
+    {
+        QStyleOptionViewItem opt = option;
+        opt.state &= ~QStyle::State_HasFocus;
+        QStyledItemDelegate::paint(painter, opt, index);
+    }
+};
+} // namespace
 
 
 //  构造函数 — 初始化 UI + 绑定所有信号
@@ -51,6 +77,9 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     // 使用外部聊天气泡 delegate（定义在 commentbubble.h 中）
     ui->listWidgetComments->setItemDelegate(new CommentBubbleDelegate(ui->listWidgetComments));
 
+    // 文件列表去掉单击单元格出现的黑色虚线焦点框（见上方 NoFocusDelegate 说明）
+    ui->treeWidgetFiles->setItemDelegate(new NoFocusDelegate(ui->treeWidgetFiles));
+
     if (!desc.isEmpty())
         ui->textEditDesc->setPlainText(desc);
     else
@@ -70,6 +99,8 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
     //按钮显式绑定
     connect(ui->buttonDownloadAll, &QPushButton::clicked,
             this, &ResourceDetailDialog::onDownloadAll);
+    connect(ui->buttonPreview, &QPushButton::clicked,
+            this, &ResourceDetailDialog::onPreviewSelected);
     connect(ui->buttonComment, &QPushButton::clicked,
             this, &ResourceDetailDialog::on_buttonComment_clicked);
     // 收藏按钮：on_buttonFavorite_clicked 并非真正的 Qt slot，connectSlotsByName 不会自动连接，
@@ -131,6 +162,22 @@ ResourceDetailDialog::ResourceDetailDialog(QWidget *parent,
             m_downloadCompleted = 0;
         }
     });
+
+    //  预览功能 — 服务端把文件流入内存（不落盘），就绪后用 FilePreviewDialog 渲染
+    //  仅在文件名与本次请求（m_previewPendingFile）匹配时响应，避免串扰其它请求
+    connect(m_fileClient, &FileClient::previewDataReady, this,
+        [=](const QString &fileName, const QByteArray &data) {
+            if (QFileInfo(fileName).fileName() != m_previewPendingFile) return;
+            m_previewPendingFile.clear();
+            FilePreviewDialog::previewData(this, fileName, data);
+        });
+    connect(m_fileClient, &FileClient::previewFailed, this,
+        [=](const QString &fileName, const QString &reason) {
+            if (QFileInfo(fileName).fileName() != m_previewPendingFile) return;
+            m_previewPendingFile.clear();
+            QMessageBox::warning(this, "预览失败", reason);
+        });
+
 
     //  评论功能 — 发送 / 接收 / 删除
     // 收到 COMMENT_END 时全量刷新评论列表
@@ -256,6 +303,37 @@ void ResourceDetailDialog::onDownloadAll()
         const QString fn = ui->treeWidgetFiles->topLevelItem(i)->data(0, Qt::UserRole).toString();
         if (!fn.isEmpty()) m_fileClient->downloadFile(fn);
     }
+}
+
+//  预览选中文件
+//  与下载完全独立：请求服务端把文件【流入内存】（不落盘），
+//  就绪后由构造函数里连接的 previewDataReady 回调用 FilePreviewDialog 渲染。
+//  m_previewPendingFile 记录本次请求的文件名，用于回调时匹配（防串扰、防重复点击）。
+void ResourceDetailDialog::onPreviewSelected()
+{
+    if (!m_fileClient) { QMessageBox::warning(this, "错误", "预览模块未初始化"); return; }
+
+    QTreeWidgetItem *item = ui->treeWidgetFiles->currentItem();
+    if (!item) {
+        const QList<QTreeWidgetItem *> sel = ui->treeWidgetFiles->selectedItems();
+        if (!sel.isEmpty()) item = sel.first();
+    }
+    if (!item) {
+        QMessageBox::information(this, "预览", "请先选择一个要预览的文件。");
+        return;
+    }
+
+    const QString fn = item->data(0, Qt::UserRole).toString();
+    if (fn.isEmpty()) return;
+
+    // 仅图片 / PDF 可预览：本地先行判断，避免无谓的网络往返
+    if (!FilePreviewDialog::isPreviewable(fn)) {
+        QMessageBox::information(this, "预览", "暂不支持预览该类型文件，目前仅支持图片和 PDF。");
+        return;
+    }
+
+    m_previewPendingFile = fn;
+    m_fileClient->requestPreview(fn);
 }
 
 //  评论列表右键菜单 — 删除自己发布的评论

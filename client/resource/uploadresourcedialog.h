@@ -35,6 +35,7 @@ private slots:
     void onClearFiles();        // 删除 treeWidgetFiles 中当前选中的行
     void onAddTag();            // 将 lineEditTag 内容加入 listWidgetTags（自动去重）
     void onSubmit();            // 收集文件路径+标签+介绍 → 调用 FileClient::uploadBatch
+    void onPreviewSelected();   // 预览当前选中的文件（本地路径 → FilePreviewDialog，解耦在独立模块）
 
 private:
     void addFileRow(const QString &path); // 向 treeWidgetFiles 添加一行（文件名|大小|类型），去重

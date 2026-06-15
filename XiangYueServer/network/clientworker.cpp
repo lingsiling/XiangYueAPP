@@ -139,6 +139,11 @@ void ClientWorker::tryProcessLines()
             const QString fn = line.section("##", 1, 1).trimmed();
             handleDownloadCommand(fn);
         }
+        else if (line.startsWith("PREVIEW##")) {
+            // 预览请求：把文件流给客户端（客户端存内存、不落盘）
+            const QString fn = line.section("##", 1, 1).trimmed();
+            handlePreviewCommand(fn);
+        }
 
         // ------------------------------------------------------------------------
         // 协议识别：上传类命令
@@ -274,8 +279,13 @@ void ClientWorker::sendFileList()
     m_socket->write(data.toUtf8());
 }
 
-void ClientWorker::sendFile(const QString &fileName)
+void ClientWorker::sendFile(const QString &fileName, bool forPreview)
 {
+    // 预览与下载只是响应头关键字不同（客户端据此决定"存内存"还是"写盘"），
+    // 文件查找、打开、分块发送逻辑完全一致。
+    const char *dataTag = forPreview ? "PREVIEW_FILE" : "FILE";
+    const char *failTag = forPreview ? "PREVIEW_FAIL" : "FILE_FAIL";
+
     // ====== 在 ServerSave 及子目录中递归查找文件 ======
     // 目录结构：ServerSave/user_<id>/session_<id>/file.pdf
     QString foundPath;
@@ -305,21 +315,21 @@ void ClientWorker::sendFile(const QString &fileName)
     }
 
     if (foundPath.isEmpty()) {
-        qDebug() << "[Worker] 下载失败：文件不存在" << fileName;
-        m_socket->write("FILE_FAIL##FILE_NOT_FOUND\n");
+        qDebug() << "[Worker]" << (forPreview ? "预览" : "下载") << "失败：文件不存在" << fileName;
+        m_socket->write(QString("%1##FILE_NOT_FOUND\n").arg(failTag).toUtf8());
         return;
     }
 
     QFile f(foundPath);
     if (!f.open(QIODevice::ReadOnly)) {
-        qDebug() << "[Worker] 无法打开下载文件:" << foundPath;
-        m_socket->write("FILE_FAIL##OPEN_FAIL\n");
+        qDebug() << "[Worker] 无法打开文件:" << foundPath;
+        m_socket->write(QString("%1##OPEN_FAIL\n").arg(failTag).toUtf8());
         return;
     }
 
     const qint64 size = f.size();
     const QString nameOnly = QFileInfo(fileName).fileName();
-    const QString head = QString("FILE##%1##%2\n").arg(nameOnly).arg(size);
+    const QString head = QString("%1##%2##%3\n").arg(dataTag).arg(nameOnly).arg(size);
     m_socket->write(head.toUtf8());
 
     while (!f.atEnd()) {
@@ -327,13 +337,20 @@ void ClientWorker::sendFile(const QString &fileName)
     }
 
     f.close();
-    qDebug() << "[Worker] 文件已发送:" << nameOnly << "(" << size << "字节)";
+    qDebug() << "[Worker]" << (forPreview ? "预览文件已发送:" : "文件已发送:") << nameOnly << "(" << size << "字节)";
 }
 
 void ClientWorker::handleDownloadCommand(const QString &fileName)
 {
     qDebug() << "[Worker] 处理DOWNLOAD命令:" << fileName;
     sendFile(fileName);
+}
+
+void ClientWorker::handlePreviewCommand(const QString &fileName)
+{
+    // 预览：把文件流给客户端，由客户端存入内存渲染（不落盘）。复用 sendFile，仅切换响应头。
+    qDebug() << "[Worker] 处理PREVIEW命令:" << fileName;
+    sendFile(fileName, /*forPreview=*/true);
 }
 
 void ClientWorker::handleRegisterCommand(const QString &line)

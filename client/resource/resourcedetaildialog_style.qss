@@ -36,7 +36,7 @@ ResourceDetailDialog QLabel#labelCommentsTitle {
     background: transparent;
 }
 
-/* 按钮：仅具体命名的按钮 */
+/* 主要操作按钮：暖橙渐变 */
 ResourceDetailDialog QPushButton#buttonDownloadAll,
 ResourceDetailDialog QPushButton#buttonFavorite,
 ResourceDetailDialog QPushButton#buttonComment {
@@ -74,6 +74,28 @@ ResourceDetailDialog QPushButton#buttonComment:pressed {
     );
 }
 
+/* 预览按钮：次要操作，采用与项目其它界面（上传资源 btnPreview / 我的上传）
+   一致的玻璃白外观，区别于上面的暖橙主操作按钮 */
+ResourceDetailDialog QPushButton#buttonPreview {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 25px;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+}
+
+ResourceDetailDialog QPushButton#buttonPreview:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+ResourceDetailDialog QPushButton#buttonPreview:pressed {
+    background: rgba(255, 255, 255, 0.35);
+}
+
 /* ============================================
    文本编辑框样式（评论输入）
    ============================================ */
@@ -103,6 +125,15 @@ ResourceDetailDialog QTreeWidget {
     color: white;
 }
 
+/* item 不设逐格 border、并关闭 outline：
+   多列 QTreeWidget 若给 item 加 border，会在每个单元格四周各画一圈，
+   点击时看起来就是一圈圈黑框；选中只改背景即可保证整行高亮连成一块。 */
+ResourceDetailDialog QListWidget::item,
+ResourceDetailDialog QTreeWidget::item {
+    border: none;
+    outline: none;
+}
+
 ResourceDetailDialog QListWidget::item:hover,
 ResourceDetailDialog QTreeWidget::item:hover {
     background: rgba(255, 255, 255, 0.15);
@@ -111,7 +142,7 @@ ResourceDetailDialog QTreeWidget::item:hover {
 ResourceDetailDialog QListWidget::item:selected,
 ResourceDetailDialog QTreeWidget::item:selected {
     background: rgba(255, 216, 155, 0.3);
-    border: 1px solid rgba(255, 216, 155, 0.5);
+    border: none;
 }
 
 /* ============================================

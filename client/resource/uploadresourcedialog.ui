@@ -104,6 +104,22 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="btnPreview">
+       <property name="minimumSize">
+        <size>
+         <width>120</width>
+         <height>36</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>预览</string>
+       </property>
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacerSelect">
        <property name="orientation">
         <enum>Qt::Orientation::Horizontal</enum>
