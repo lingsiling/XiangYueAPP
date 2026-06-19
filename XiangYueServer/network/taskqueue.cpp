@@ -1,17 +1,6 @@
-// taskqueue.cpp
+// taskqueue.cpp — 全局任务队列实现
 #include "taskqueue.h"
-#include "threadpool.h"
 #include <QDebug>
-
-TaskQueue::TaskQueue(QObject *parent)
-    : QObject(parent), m_isRunning(false)
-{
-}
-
-TaskQueue::~TaskQueue()
-{
-    stop();
-}
 
 void TaskQueue::enqueue(std::function<void()> handler,
                         Priority priority,
@@ -22,96 +11,66 @@ void TaskQueue::enqueue(std::function<void()> handler,
         return;
     }
 
-    QMutexLocker locker(&m_mutex);
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
 
-    Task task;
-    task.priority = priority;
-    task.handler = handler;
-    task.description = desc.isEmpty() ? "Unknown Task" : desc;
-
-    m_queue.enqueue(task);
-
-    qDebug() << "[TaskQueue] 任务入队:" << task.description
-             << "优先级:" << task.priority
-             << "队列长度:" << m_queue.size();
-
-    //通知处理线程有新任务
-    m_waitCondition.wakeAll();
-}
-
-int TaskQueue::pendingCount() const
-{
-    QMutexLocker locker(&m_mutex);
-    return m_queue.size();
-}
-
-void TaskQueue::start()
-{
-    if (m_isRunning) {
-        qDebug() << "[TaskQueue] 任务队列已启动，跳过重复启动";
-        return;
-    }
-
-    m_isRunning = true;
-    qDebug() << "[TaskQueue] 任务队列已启动";
-
-    // 提交一个长期运行的任务处理循环
-    ThreadPool::instance().submit([this]() {
-        processQueue();
-    });
-}
-
-void TaskQueue::processQueue()
-{
-    //注意：这个函数运行在线程池的工作线程中
-    while (m_isRunning) {
-        Task task;
-
-        {
-            QMutexLocker locker(&m_mutex);
-
-            //队列为空，等待新任务或超时
-            if (m_queue.isEmpty()) {
-                // 等待超时（1秒）或被唤醒
-                if (!m_waitCondition.wait(&m_mutex, 1000)) {
-                    //超时，继续检查 m_isRunning
-                    continue;
-                }
-            }
-
-            //再次检查队列（可能在等待中被停止）
-            if (m_queue.isEmpty()) {
-                continue;
-            }
-
-            task = m_queue.dequeue();
-        } //释放锁
-
-        //执行任务（不持有锁）
-        if (task.handler) {
-            try {
-                emit taskStarted(task.description);
-                task.handler();
-                emit taskCompleted(task.description);
-                qDebug() << "[TaskQueue] 任务完成:" << task.description;
-            }
-            catch (const std::exception &e) {
-                qWarning() << "[TaskQueue] 任务异常:" << task.description << e.what();
-                emit taskError(task.description, QString::fromStdString(e.what()));
-            }
-            catch (...) {
-                qWarning() << "[TaskQueue] 任务未知异常:" << task.description;
-                emit taskError(task.description, "Unknown error");
-            }
+        // 已停止则不再接收新任务（避免停机过程中还往里塞）
+        if (m_stopped) {
+            qWarning() << "[TaskQueue] 队列已停止，拒绝入队:" << desc;
+            return;
         }
+
+        Task task;
+        task.priority = priority;
+        task.handler = std::move(handler);
+        task.description = desc;
+        task.seq = m_seqCounter++;   // 记录入队顺序，保证同优先级 FIFO
+
+        m_queue.push(std::move(task));
     }
 
-    qDebug() << "[TaskQueue] 处理循环已退出";
+    // 唤醒一个等待的 worker 来处理（在锁外通知，减少惊群后的锁竞争）
+    m_cv.notify_one();
+}
+
+bool TaskQueue::dequeue(Task &out)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    // 阻塞等待：直到"有任务"或"已停止"
+    m_cv.wait(lock, [this]() {
+        return !m_queue.empty() || m_stopped;
+    });
+
+    // 被 stop() 唤醒且确实没有任务了 → 返回 false，worker 据此退出循环
+    if (m_queue.empty()) {
+        return false;
+    }
+
+    // priority_queue 的 top() 即"最该先执行"的任务；取出后必须 pop
+    out = m_queue.top();
+    m_queue.pop();
+    return true;
 }
 
 void TaskQueue::stop()
 {
-    m_isRunning = false;
-    m_waitCondition.wakeAll();
-    qDebug() << "[TaskQueue] 任务队列已停止";
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_stopped = true;
+    }
+    // 唤醒所有 worker：有剩余任务的继续取走执行，没任务的 dequeue 返回 false 后退出
+    m_cv.notify_all();
+}
+
+int TaskQueue::size() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return static_cast<int>(m_queue.size());
+}
+
+bool TaskQueue::isStopped() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_stopped;
 }

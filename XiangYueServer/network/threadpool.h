@@ -1,55 +1,81 @@
 #ifndef THREADPOOL_H
 #define THREADPOOL_H
 
-#include <QObject>
-#include <QThreadPool>
+#include "taskqueue.h"
+#include <thread>
+#include <vector>
+#include <atomic>
 #include <functional>
-#include <memory>
 
 /*
- * ThreadPool：全局线程池管理器
- * 作用：
- *   - 统一管理应用级别的线程资源
- *   - 为异步任务执行和IO操作提供线程支持
- *   - 单例模式，应用全局仅一个实例
+ * ThreadPool：业务线程池（"任务队列 + 线程池"模型里的【线程池】部分）
  *
- * 设计要点：
- *   - 低耦合：只提供任务提交接口，不关心业务逻辑
- *   - 高效率：通过线程重用避免频繁创建销毁线程
- *   - 可扩展：为后续IO多路复用预留扩展空间
+ * 职责：
+ *   - 启动固定数量的 worker 线程，每个 worker 阻塞地从全局 TaskQueue 取任务并执行。
+ *   - 对外只暴露 submit()（投递业务闭包），调用方完全不需要关心线程细节。
+ *
+ * 在整体架构里的位置：
+ *   IOCP 工作线程（只做 I/O）解析出业务请求后 → Connection::post() → 最终 submit()
+ *   到本线程池 → worker 执行 Qt service（查库/读文件）→ 产出响应字节 →
+ *   conn->postSend() 交回网络层发送。
+ *   ★ worker 线程绝不调用任何 socket API ★（发送由 IOCP 线程的 WSASend 完成）
+ *
+ * 与旧实现的区别：
+ *   旧实现是 QThreadPool 包装 + 每连接一个自旋的 processQueue → 连接一多就饿死。
+ *   新实现是"固定 worker 数 + 共享阻塞队列"，连接数与线程数解耦，空闲不占 CPU。
+ *
+ * 数据库：
+ *   每个 worker 第一次执行查库任务时，DBConnectionPool 会惰性地为该线程创建
+ *   独立的 SQLite 连接（thread_local，天然线程隔离）。worker 退出前主动关闭，
+ *   避免进程结束时 QtSql 跨线程析构告警。
  */
-class ThreadPool : public QObject
+class ThreadPool
 {
-    Q_OBJECT
-
 public:
-    //获取全局线程池单例
+    // 全局唯一实例
     static ThreadPool& instance();
 
-    //初始化线程池
-    //threadCount: 线程数量（-1表示按CPU核心数自动调整）
+    /*
+     * 初始化并启动线程池。
+     * threadCount  worker 数量；<=0 时按 CPU 核心数 + 1 自动取值
+     *                     （+1 是为了在某个任务偶尔阻塞于磁盘 I/O 时仍有吞吐）
+     * 重复调用会被忽略。
+     */
     void initialize(int threadCount = -1);
 
-    //提交异步任务（支持lambda表达式）
-    void submit(std::function<void()> task);
+    /*
+     * 投递一个业务任务。线程安全，可从任意线程调用。
+     * task      业务闭包
+     * priority  优先级（登录/注册等可用 HIGH）
+     * desc      调试描述
+     */
+    void submit(std::function<void()> task,
+                TaskQueue::Priority priority = TaskQueue::NORMAL,
+                const QString &desc = QString());
 
-    //查询线程池状态
-    int maxThreadCount() const;
-    int activeThreadCount() const;
-    bool isRunning() const { return m_isRunning; }
+    /*
+     * 停止线程池：停止队列 → 唤醒并 join 所有 worker。
+     * 已入队任务会被排空执行完，之后 worker 退出。可安全多次调用。
+     */
+    void shutdown();
 
-    //获取底层QThreadPool（兼容Qt现有API）
-    QThreadPool* pool() const { return m_pool; }
+    int maxThreadCount() const { return m_threadCount; }
+    int pendingTasks() const { return m_queue.size(); }
+    bool isRunning() const { return m_running.load(); }
 
 private:
-    ThreadPool();
+    ThreadPool() = default;
     ~ThreadPool();
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
 
-private:
-    QThreadPool *m_pool;
-    bool m_isRunning;
+    // worker 线程主循环：从队列取任务并执行，直到队列停止
+    void workerLoop();
+
+    TaskQueue m_queue;            // 全局任务队列（worker 共享）
+    std::vector<std::thread> m_workers;          // worker 线程
+    int m_threadCount = 0;  // worker 数量
+    std::atomic<bool> m_running{false};   // 是否在运行
 };
 
 #endif // THREADPOOL_H

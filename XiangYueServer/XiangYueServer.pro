@@ -2,6 +2,14 @@ QT += widgets network sql
 
 CONFIG += c++17
 
+# ---- 原生 Windows IOCP 所需 ----
+# Winsock2：WSAStartup/WSARecv/WSASend/accept 等都在 ws2_32。
+# 用阻塞 accept（不用 AcceptEx），故无需 -lmswsock；
+# CreateIoCompletionPort/GetQueuedCompletionStatus 属 kernel32（默认链接）。
+LIBS += -lws2_32
+# 指定目标 Windows 版本（Win7+），启用 inet_ntop 等 API。
+DEFINES += _WIN32_WINNT=0x0601
+
 # ---- 模块化目录：把各功能模块文件夹加入头文件搜索路径 ----
 # 这样所有源码里平铺式的 #include "xxx.h" 无需改写即可跨文件夹找到头文件。
 INCLUDEPATH += $$PWD/app \
@@ -17,7 +25,8 @@ INCLUDEPATH += $$PWD/app \
 SOURCES += \
     app/main.cpp \
     app/serverwidget.cpp \
-    network/threadedtcpserver.cpp \
+    network/iocpserver.cpp \
+    network/connection.cpp \
     network/clientworker.cpp \
     network/taskqueue.cpp \
     network/threadpool.cpp \
@@ -36,7 +45,10 @@ SOURCES += \
 
 HEADERS += \
     app/serverwidget.h \
-    network/threadedtcpserver.h \
+    network/iocpserver.h \
+    network/connection.h \
+    network/iocontext.h \
+    network/serverconfig.h \
     network/clientworker.h \
     network/taskqueue.h \
     network/threadpool.h \
